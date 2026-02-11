@@ -1,0 +1,935 @@
+---
+import nav from '../data/nav.json';
+import site from '../data/site.json';
+import AnalyticsBeacon from '../components/AnalyticsBeacon.astro';
+import enhanceUrl from '../scripts/enhance.js?url';
+import navUrl from '../scripts/nav.js?url';
+import searchUrl from '../scripts/search.js?url';
+import hotkeysUrl from '../scripts/hotkeys.js?url';
+import pfadUrl from '../scripts/pfad.js?url';
+// Global CSS via Vite pipeline (hashed + cache-safe + CSP-friendly)
+import siteCssUrl from '../styles/site.css?url';
+
+const {
+  title = site.siteName,
+  description = site.defaultDescription,
+  canonical,
+  robots,
+  ogType = 'website',
+  ogImage = site.defaultOgImage,
+  updated = null,
+  // Optional JSON-LD structured data (object or array)
+  structuredData = null,
+} = Astro.props;
+
+const fullTitle = title === site.siteName ? title : `${title} – ${site.siteName}`;
+
+// Normalize base URL for consistent structured data / link generation.
+const baseUrlNoSlash = site.baseUrl.endsWith('/') ? site.baseUrl.slice(0, -1) : site.baseUrl;
+const baseUrlSlash = `${baseUrlNoSlash}/`;
+
+// Canonical: if not provided, derive from Astro.url + site.baseUrl
+const canonicalUrl = canonical
+  ? canonical
+  : (Astro.site
+      ? new URL(Astro.url.pathname, Astro.site).toString()
+      : new URL(Astro.url.pathname, site.baseUrl).toString());
+
+const robotsValue = robots ?? 'index,follow';
+ 
+
+const ogImageUrl = ogImage.startsWith('http')
+  ? ogImage
+  : new URL(ogImage, baseUrlSlash).toString();
+
+// Optional: expose a stable ISO timestamp for share cards / crawlers.
+// We only store YYYY-MM-DD in frontmatter, so we normalize it to midnight UTC.
+const updatedIso = (updated && /^\d{4}-\d{2}-\d{2}$/.test(String(updated)))
+  ? `${updated}T00:00:00Z`
+  : null;
+
+// Helpers for active states + chapter roots
+const norm = (p) => {
+  if (!p) return '/';
+  try { p = new URL(p, 'https://example.com').pathname; } catch {}
+  return p.endsWith('/') ? p : `${p}/`;
+};
+const current = norm(Astro.url?.pathname || '/');
+
+const segFromHref = (href) => (String(href || '/').split('/').filter(Boolean)[0] || '');
+
+const chapterRootForCol = (col) => {
+  const seg = segFromHref(col?.items?.[0]?.href ?? '/');
+  return seg ? `/${seg}/` : '/';
+};
+
+// Defensive: entfernte/leer gewordene Kapitel sollen in der Navigation nicht mehr auftauchen.
+const chapters = (nav.chapters ?? []).filter((c) => Array.isArray(c.items) && c.items.length > 0);
+
+// Mobile drawer should stay lightweight: show only chapter roots, not every subpage.
+const chapterRoots = chapters.map((col) => ({
+  label: col.title,
+  href: chapterRootForCol(col),
+}));
+
+// Mega-Menü Kapitel: Progressive Disclosure
+// Standard: nur die wichtigsten 8 Hauptbereiche anzeigen → Rest via "Mehr"
+// Keep sitewide navigation lightweight to reduce "link noise" and help crawlers focus on key hubs.
+// Everything else stays reachable via "Mehr" and the /verzeichnis/ page.
+const MAIN_CHAPTERS_MAX = 6;
+const mainChapterCols = chapters.slice(0, MAIN_CHAPTERS_MAX);
+const moreChapterCols = chapters.slice(MAIN_CHAPTERS_MAX);
+
+
+// Mega-Menü für "Themen": gruppiert + ikonisiert (Handbuch-Feeling)
+// NOTE: Das Kapitel heißt in nav.json "Themen" (früher: "Anleitungen").
+const themenCol = chapters.find((c) => String(c.title).toLowerCase() === 'themen');
+const themenItems = themenCol?.items ?? [];
+const byHref = new Map((themenItems ?? []).map((it) => [norm(it.href), it]));
+const pick = (hrefs) => hrefs.map((h) => byHref.get(norm(h))).filter(Boolean);
+
+const devicesGroup = pick(['/plattformen/android/','/plattformen/ios/','/plattformen/windows/','/plattformen/macos/','/plattformen/linux/','/plattformen/router/','/geraete-sicherheit/','/berechtigungen/','/standort/']);
+const webGroup = pick(['/browser/','/suche/','/tracking/','/kommunikation/','/email/','/social/','/streaming/','/bezahlen/','/datenleaks/','/oeffentlichkeit/']);
+const securityGroup = pick(['/passwoerter/','/2fa/','/konto/','/telefonnummer/','/identitaet/','/dns/','/vpn/','/netzwerk/','/cloud/','/backups/','/verschluesselung/','/updates/','/dateien/','/betrug/','/datenbroker/']);
+
+
+// Mega menu: Wissen & Tests (like Themen, but compact)
+const wissenCol = chapters.find((c) => String(c.title).toLowerCase() === "wissen");
+const wissenItems = wissenCol?.items ?? [];
+const wissenLinks = wissenItems.filter((it) => norm(it.href) !== "/wissen/" );
+
+// Avoid duplicate links in Wissen mega menu:
+// Left side shows curated quick links (Bedrohungsmodell/Begriffe/FAQ), right side shows the rest.
+const wissenQuickSet = new Set([
+  norm('/wissen/bedrohungsmodell/'),
+  norm('/wissen/begriffe/'),
+  norm('/wissen/faq/'),
+]);
+const wissenLinksDedup = wissenLinks.filter((it) => !wissenQuickSet.has(norm(it.href)));
+
+const testsCol = chapters.find((c) => String(c.title).toLowerCase() === "tests");
+const testsItems = testsCol?.items ?? [];
+const testsLinks = testsItems.filter((it) => norm(it.href) !== "/tests/" );
+
+// Avoid duplicate links in Tests mega menu:
+// Left side shows curated quick links (Browser/DNS/IP leak), right side shows the rest.
+const testsQuickSet = new Set([
+  norm('/tests/browser-check/'),
+  norm('/tests/dns-leak-test/'),
+  norm('/tests/ip-leak-test/'),
+]);
+const testsLinksDedup = testsLinks.filter((it) => !testsQuickSet.has(norm(it.href)));
+// ------------------------------------------------------------------
+// Unterseiten für Mega-Menü (automatisch aus src/pages/*.md)
+// ------------------------------------------------------------------
+// IMPORTANT:
+// Astro.glob() erzeugt intern dynamische Imports. Da Markdown-Dateien unter src/pages
+// gleichzeitig echte Routen-Entry-Points sind, führt das in Vite zu Chunk-Warnungen
+// (dynamisch + statisch importiert). Mit import.meta.glob(..., { eager: true })
+// werden die Module statisch/eager geladen und die Warnung verschwindet.
+const mdMods = import.meta.glob('../pages/**/*.md', { eager: true });
+const allPages = Object.values(mdMods)
+  .map((m) => {
+    const mod = m;
+    return {
+      href: norm(mod.frontmatter?.url || ''),
+      label: String(mod.frontmatter?.title || '').trim(),
+    };
+  })
+  .filter((p) => p.href && p.href.startsWith('/'));
+
+// parent von "/a/b/" ist "/a/" ; parent von "/a/" ist "/"
+const parentOfHref = (href) => {
+  const h = norm(href);
+  if (h === '/') return null;
+  const parts = h.split('/').filter(Boolean);
+  if (parts.length <= 1) return '/';
+  return '/' + parts.slice(0, -1).join('/') + '/';
+};
+const depthOfHref = (href) => norm(href).split('/').filter(Boolean).length;
+
+const childrenByParent = new Map();
+for (const p of allPages) {
+  const parent = parentOfHref(p.href);
+  if (!parent) continue;
+  if (!childrenByParent.has(parent)) childrenByParent.set(parent, []);
+  childrenByParent.get(parent).push(p);
+}
+for (const [k, arr] of childrenByParent) {
+  arr.sort((a, b) => (a.label || a.href).localeCompare(b.label || b.href, 'de'));
+}
+
+// gibt nur direkte Kinder zurück (eine Ebene tiefer)
+const directChildren = (parentHref) => {
+  const p = norm(parentHref);
+  const base = childrenByParent.get(p) || [];
+  const wantDepth = depthOfHref(p) + 1;
+  return base.filter((c) => depthOfHref(c.href) === wantDepth);
+};
+
+const iconForHref = (href) => {
+  const h = norm(href);
+  // SVG strings rendered via set:html (CSP-safe)
+  const svg = (p) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+
+  // Plattformen
+  if (h.startsWith('/plattformen/')) return svg('<rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M7 20h10"></path><path d="M12 16v4"></path>');
+  if (h.startsWith('/geraete-sicherheit/')) return svg('<path d="M12 2l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V6l8-4z"></path><path d="M9.5 12l1.8 1.8L15.5 9.7"></path>');
+  if (h.startsWith('/hardware/')) return svg('<path d="M9 3h6v2H9z"></path><path d="M4 7h16v10H4z"></path><path d="M8 21h8"></path>');
+
+  // Privatsphäre-Themen
+  if (h.startsWith('/standort/')) return svg('<path d="M12 21s7-4.5 7-11a7 7 0 1 0-14 0c0 6.5 7 11 7 11z"></path><circle cx="12" cy="10" r="2"></circle>');
+  if (h.startsWith('/berechtigungen/')) return svg('<rect x="4" y="4" width="16" height="16" rx="3"></rect><path d="M9 12h6"></path><path d="M12 9v6"></path>');
+  if (h.startsWith('/suche/')) return svg('<circle cx="11" cy="11" r="6"></circle><path d="M20 20l-3.5-3.5"></path>');
+  if (h.startsWith('/ki/')) return svg('<rect x="8" y="8" width="8" height="8" rx="2"></rect><path d="M9 1v3"></path><path d="M15 1v3"></path><path d="M9 20v3"></path><path d="M15 20v3"></path><path d="M1 9h3"></path><path d="M1 15h3"></path><path d="M20 9h3"></path><path d="M20 15h3"></path>');
+  if (h.startsWith('/streaming/')) return svg('<rect x="3" y="6" width="18" height="12" rx="2"></rect><path d="M10 10l5 2-5 2z"></path>');
+  if (h.startsWith('/bezahlen/')) return svg('<rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M3 10h18"></path><path d="M7 15h4"></path>');
+  if (h.startsWith('/datenleaks/')) return svg('<path d="M12 2s6 5 6 10a6 6 0 0 1-12 0c0-5 6-10 6-10z"></path><path d="M12 11v4"></path><path d="M12 17h.01"></path>');
+  if (h.startsWith('/oeffentlichkeit/')) return svg('<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle>');
+  if (h.startsWith('/browser/')) return svg('<circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3a15 15 0 0 1 0 18"></path><path d="M12 3a15 15 0 0 0 0 18"></path>');
+  if (h.startsWith('/tracking/')) return svg('<circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 3"></path>');
+  if (h.startsWith('/kommunikation/')) return svg('<path d="M21 15a4 4 0 0 1-4 4H8l-5 3 1.5-4.5A4 4 0 0 1 3 15V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"></path>');
+  if (h.startsWith('/email/')) return svg('<path d="M4 6h16v12H4z"></path><path d="M4 7l8 6 8-6"></path>');
+  if (h.startsWith('/social/')) return svg('<path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="3"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a3 3 0 0 1 0 5.74"></path>');
+
+  // Sicherheit & Konten
+  if (h.startsWith('/passwoerter/')) return svg('<path d="M21 10h-8"></path><path d="M7 10H3"></path><path d="M7 10a5 5 0 1 0 10 0a5 5 0 1 0-10 0"></path><path d="M17 14h4v4h-4z"></path>');
+  if (h.startsWith('/2fa/')) return svg('<path d="M12 12a4 4 0 1 0 4 4"></path><path d="M16 8V6a4 4 0 0 0-8 0v2"></path><path d="M7 12h10"></path>');
+  if (h.startsWith('/konto/')) return svg('<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="3"></circle><path d="M19 8l-3 3"></path><path d="M16 8h3v3"></path>');
+  if (h.startsWith('/telefonnummer/')) return svg('<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.08 4.18 2 2 0 0 1 4.06 2h3a2 2 0 0 1 2 1.72c.12.86.31 1.7.57 2.5a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.58-1.09a2 2 0 0 1 2.11-.45c.8.26 1.64.45 2.5.57A2 2 0 0 1 22 16.92z"></path>');
+  if (h.startsWith('/identitaet/')) return svg('<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="3"></circle>');
+  if (h.startsWith('/dns/')) return svg('<path d="M4 7h16"></path><path d="M4 12h16"></path><path d="M4 17h16"></path><path d="M7 7v10"></path><path d="M17 7v10"></path>');
+  if (h.startsWith('/vpn/')) return svg('<path d="M12 2l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V6l8-4z"></path><path d="M9 12h6"></path>');
+  if (h.startsWith('/netzwerk/')) return svg('<circle cx="12" cy="12" r="3"></circle><path d="M3 12a9 9 0 0 1 18 0"></path><path d="M6 12a6 6 0 0 1 12 0"></path>');
+
+  // Daten & Schutz
+  if (h.startsWith('/cloud/')) return svg('<path d="M17.5 19H7a4 4 0 0 1 0-8 5 5 0 0 1 9.5-1.5A3.5 3.5 0 0 1 17.5 19z"></path>');
+  if (h.startsWith('/backups/')) return svg('<path d="M21 12a9 9 0 1 1-3-6.7"></path><path d="M21 3v6h-6"></path><path d="M12 7v5l3 2"></path>');
+  if (h.startsWith('/verschluesselung/')) return svg('<rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>');
+  if (h.startsWith('/updates/')) return svg('<path d="M21 12a9 9 0 1 1-3-6.7"></path><path d="M21 3v6h-6"></path>');
+  if (h.startsWith('/dateien/')) return svg('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path>');
+
+  // Risiken
+  if (h.startsWith('/betrug/')) return svg('<path d="M12 9v2"></path><path d="M12 15h.01"></path><path d="M10.3 3.2L2.5 19a2 2 0 0 0 1.8 3h15.4a2 2 0 0 0 1.8-3L13.7 3.2a2 2 0 0 0-3.4 0z"></path>');
+  if (h.startsWith('/datenbroker/')) return svg('<path d="M20 7H4"></path><path d="M20 12H4"></path><path d="M20 17H4"></path><path d="M7 7v10"></path>');
+
+  // Navigation / Meta
+  if (h.startsWith('/privacy-check/')) return svg('<path d="M9 12l2 2 4-4"></path><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>');
+  // Tests (specific tools)
+  if (h.startsWith('/tests/browser-check/')) return svg('<circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3a15 15 0 0 1 0 18"></path><path d="M12 3a15 15 0 0 0 0 18"></path>');
+  if (h.startsWith('/tests/dns-leak-test/')) return svg('<path d="M4 7h16"></path><path d="M4 12h16"></path><path d="M4 17h16"></path><path d="M7 7v10"></path><path d="M17 7v10"></path><path d="M20 20l-4-4"></path>');
+  if (h.startsWith('/tests/ip-leak-test/')) return svg('<path d="M12 2l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V6l8-4z"></path><path d="M8 14l8-8"></path><path d="M8 10h.01"></path>');
+  if (h.startsWith('/tests/webrtc-test/')) return svg('<rect x="2" y="7" width="14" height="10" rx="2"></rect><path d="M16 10l6-3v10l-6-3z"></path>');
+  if (h.startsWith('/tests/fingerprinting-test/')) return svg('<path d="M12 11a3 3 0 0 1 3 3v4"></path><path d="M9 14v4"></path><path d="M15 14v3"></path><path d="M12 8a6 6 0 0 0-6 6v2"></path><path d="M18 16v-2a6 6 0 0 0-6-6"></path>');
+  if (h.startsWith('/tests/email-check/')) return svg('<path d="M4 6h16v12H4z"></path><path d="M4 7l8 6 8-6"></path><path d="M7 16h10"></path>');
+  if (h.startsWith('/tests/passwort-check/')) return svg('<path d="M7 10a5 5 0 1 0 2 4"></path><path d="M11 14h10"></path><path d="M17 14v4"></path><path d="M21 14v4"></path>');
+  if (h.startsWith('/tests/privacy-check/')) return svg('<path d="M9 12l2 2 4-4"></path><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>');
+  if (h.startsWith('/tests/')) return svg('<path d="M9 2h6"></path><path d="M12 2v4"></path><path d="M5 8h14"></path><path d="M7 8v13h10V8"></path>');
+  if (h.startsWith('/szenarien/')) return svg('<path d="M3 11h18"></path><path d="M3 7h18"></path><path d="M3 15h18"></path>');
+  if (h.startsWith('/anbieter/')) return svg('<path d="M4 6h16"></path><path d="M4 10h16"></path><path d="M4 14h16"></path><path d="M4 18h16"></path>');
+  // Wissen (specific pages)
+  if (h.startsWith('/wissen/faq/')) return svg('<circle cx="12" cy="12" r="9"></circle><path d="M9.2 9a3 3 0 0 1 5.6 1c0 2-3 2-3 4"></path><path d="M12 17h.01"></path>');
+  if (h.startsWith('/wissen/glossar/')) return svg('<path d="M4 19a2 2 0 0 0 2 2h14"></path><path d="M6 17V5a2 2 0 0 1 2-2h12v16H8a2 2 0 0 0-2 2z"></path><path d="M10 7h6"></path><path d="M10 11h6"></path>');
+  if (h.startsWith('/wissen/begriffe/')) return svg('<path d="M20 12l-8 8-10-10V2h8z"></path><circle cx="7.5" cy="7.5" r="1.5"></circle>');
+  if (h.startsWith('/wissen/mythen/')) return svg('<path d="M12 2l1.6 5.2L19 9l-5.4 1.8L12 16l-1.6-5.2L5 9l5.4-1.8z"></path><path d="M4 20l16-16"></path>');
+  if (h.startsWith('/wissen/bedrohungsmodell/')) return svg('<circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="4"></circle><path d="M12 2v4"></path><path d="M12 18v4"></path><path d="M2 12h4"></path><path d="M18 12h4"></path>');
+  if (h.startsWith('/wissen/anonymitaet-vs-privatsphaere/')) return svg('<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12z"></path><path d="M8 15c1 1 2.3 1.5 4 1.5S15 16 16 15"></path><path d="M9 11h.01"></path><path d="M15 11h.01"></path>');
+  if (h.startsWith('/wissen/daten-minimierung/')) return svg('<circle cx="6" cy="6" r="2"></circle><circle cx="6" cy="18" r="2"></circle><path d="M20 4L8 16"></path><path d="M8 8l12 12"></path>');
+  if (h.startsWith('/wissen/metadaten-grundlagen/')) return svg('<circle cx="12" cy="6" r="2"></circle><circle cx="6" cy="18" r="2"></circle><circle cx="18" cy="18" r="2"></circle><path d="M12 8v6"></path><path d="M10.8 14.5L7.7 17"></path><path d="M13.2 14.5l3.1 2.5"></path>');
+  if (h.startsWith('/wissen/quellen/')) return svg('<path d="M10 13a5 5 0 0 1 0-7l1-1a5 5 0 0 1 7 7l-1 1"></path><path d="M14 11a5 5 0 0 1 0 7l-1 1a5 5 0 0 1-7-7l1-1"></path>');
+  if (h.startsWith('/wissen/uebersehene-stolpersteine/')) return svg('<path d="M10.3 3.2L2.5 19a2 2 0 0 0 1.8 3h15.4a2 2 0 0 0 1.8-3L13.7 3.2a2 2 0 0 0-3.4 0z"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path>');
+  if (h.startsWith('/wissen/')) return svg('<path d="M4 19a2 2 0 0 0 2 2h14"></path><path d="M6 17V5a2 2 0 0 1 2-2h12v16H8a2 2 0 0 0-2 2z"></path>');
+  if (h.startsWith('/start/')) return svg('<path d="M3 11l9-8 9 8"></path><path d="M9 22V12h6v10"></path>');
+
+  return svg('<circle cx="12" cy="12" r="9"></circle>');
+};
+const inAnyChapter = chapterRoots.some(x => {
+  const h = norm(x.href);
+  return h !== '/' && current.startsWith(h);
+});
+
+const isExact = (href) => current === norm(href);
+
+const isInPath = (href) => {
+  const h = norm(href);
+  if (h === '/') return current === '/';
+  return current.startsWith(h);
+};
+
+const previewForCol = (col) => (col?.items ?? []).slice(0, 3).map((it) => it.label).join(' · ');
+
+// Navigation labels: keep common terms consistent (readability + accessibility).
+// This is defensive: even if content/data changes later, the UI stays consistent.
+const prettyNavLabel = (s) => {
+  const t = String(s ?? '');
+  return t
+    .replace(/\bipv6\b/gi, 'IPv6')
+    .replace(/\bwlan\b/gi, 'WLAN')
+    .replace(/\bpublic\s+wlan\b/gi, 'Public WLAN')
+    .replace(/\bios\b/gi, 'iOS')
+    .replace(/\bwindows\b/gi, 'Windows')
+    .replace(/\blinux\b/gi, 'Linux');
+};
+
+---
+<!doctype html>
+<html lang={site.language}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <meta name="robots" content={robotsValue} />
+    <meta name="theme-color" content={site.themeColor} />
+    <link rel="canonical" href={canonicalUrl} />
+    <link rel="alternate" hreflang="de" href={canonicalUrl} />
+    <link rel="alternate" type="application/rss+xml" title="PrivacyBasics RSS" href="/rss.xml" />
+
+    <!-- Basics -->
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- Icons -->
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
+
+    <!-- Open Graph -->
+    <meta property="og:site_name" content={site.siteName} />
+    <meta property="og:locale" content={site.locale} />
+    <meta property="og:type" content={ogType} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:image" content={ogImageUrl} />
+    <meta property="og:image:secure_url" content={ogImageUrl} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="PrivacyBasics" />
+
+    {updatedIso ? <meta property="og:updated_time" content={updatedIso} /> : null}
+    {ogType === 'article' && updatedIso ? <meta property="article:modified_time" content={updatedIso} /> : null}
+
+    <!-- Twitter -->
+    <meta name="twitter:domain" content={new URL(site.baseUrl).hostname} />
+    <meta name="twitter:card" content="summary_large_image" />
+    {site.twitterHandle ? <meta name="twitter:site" content={site.twitterHandle} /> : null}
+    <meta name="twitter:title" content={fullTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:url" content={canonicalUrl} />
+    <meta name="twitter:image" content={ogImageUrl} />
+    <meta name="twitter:image:alt" content={fullTitle} />
+<script type="module" src={enhanceUrl}></script>
+
+    {/* JSON-LD: keep it optional and lightweight */}
+    {structuredData ? (
+      <script
+        type="application/ld+json"
+        set:html={JSON.stringify(structuredData)}
+      />
+    ) : null}
+
+    <!-- Global stylesheet (Vite pipeline, hashed) -->
+    <link rel="stylesheet" href={siteCssUrl} />
+  </head>
+  <body>
+    <a class="skip-link" href="#content">Zum Inhalt springen</a>
+<header class="site-header">
+      <div class="container header-row">
+        <a class="brand" href="/" aria-label="Zur Startseite">
+          <span class="brand-mark" aria-hidden="true">PB</span>
+          <span class="brand-text">{nav.brand}</span>
+        </a>
+
+        <nav class="nav" aria-label="Hauptnavigation">
+          
+  {((nav.primary ?? [])).map((it) => {
+    let active = isInPath(it.href);
+    const labelLower = String(it.label || '').toLowerCase();
+    if (labelLower.includes('methodik')) {
+      // Platzhalter: ggf. später spezielle Behandlung
+    }
+    const isThemen = String(it.label).toLowerCase() === 'themen';
+    const isWissen = String(it.label).toLowerCase() === 'wissen';
+    const isTests = String(it.label).toLowerCase() === 'tests';
+
+    if (isThemen) {
+      return (
+        <div class={'nav-item nav-kapitel' + ((active || inAnyChapter) ? ' active' : '')}>
+          <a
+            href={it.href}
+            class={active ? 'active' : ''}
+            aria-current={active && 'page'}
+          >{prettyNavLabel(it.label)}</a>
+          <button
+            class={inAnyChapter ? 'nav-btn active' : 'nav-btn'}
+            id="megaBtn"
+            type="button"
+            aria-label="Themen-Menü öffnen"
+            aria-expanded="false"
+            aria-controls="mega"
+          >
+            <span class="caret" aria-hidden="true"></span>
+          </button>
+        </div>
+      );
+    }
+
+    if (isWissen) {
+      return (
+        <div class={'nav-item nav-kapitel' + (active ? ' active' : '')}>
+          <a
+            href={it.href}
+            class={active ? 'active' : ''}
+            aria-current={active && 'page'}
+          >{prettyNavLabel(it.label)}</a>
+          <button
+            class={active ? 'nav-btn active' : 'nav-btn'}
+            id="megaWissenBtn"
+            type="button"
+            aria-label="Wissen-Menü öffnen"
+            aria-expanded="false"
+            aria-controls="megaWissen"
+          >
+            <span class="caret" aria-hidden="true"></span>
+          </button>
+        </div>
+      );
+    }
+
+    if (isTests) {
+      return (
+        <div class={'nav-item nav-kapitel' + (active ? ' active' : '')}>
+          <a
+            href={it.href}
+            class={active ? 'active' : ''}
+            aria-current={active && 'page'}
+          >{prettyNavLabel(it.label)}</a>
+          <button
+            class={active ? 'nav-btn active' : 'nav-btn'}
+            id="megaTestsBtn"
+            type="button"
+            aria-label="Tests-Menü öffnen"
+            aria-expanded="false"
+            aria-controls="megaTests"
+          >
+            <span class="caret" aria-hidden="true"></span>
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <a
+        href={it.href}
+        class={active ? 'active' : ''}
+        aria-current={active && 'page'}
+      >{prettyNavLabel(it.label)}</a>
+    );
+  })}
+</nav>
+
+		<!-- Suche: dauerhaft im Header sichtbar (+ Tastenkürzel "/").
+		     Auf Mobil wird sie bei Bedarf in eine zweite Zeile umgebrochen. -->
+		<form class="header-search site-search top-search" action="/start/" method="get" role="search" aria-label="Seitensuche">
+			<label class="sr-only" for="siteSearch">Suche</label>
+			<input
+				id="siteSearch"
+				name="q"
+				type="search"
+				placeholder="Suche… (/)"
+				aria-keyshortcuts="/"
+				autocomplete="off"
+				spellcheck="false"
+			/>
+			<label class="sr-only" for="siteSearchScope">Bereich</label>
+			<select id="siteSearchScope" name="t" class="search-scope" aria-label="Bereich">
+				<option value="all">Alles</option>
+				<option value="start">Start</option>
+				<option value="themen">Themen</option>
+				<option value="privacy">Privacy Check</option>
+				<option value="anbieter">Anbieter</option>
+				<option value="szenarien">Szenarien</option>
+				<option value="wissen">Wissen</option>
+				<option value="tests">Tests</option>
+				<option value="verzeichnis">Verzeichnis</option>
+			</select>
+			<div id="searchStatus" class="sr-only" aria-live="polite"></div>
+			<div id="searchResults" class="search-results" aria-label="Suchergebnisse"></div>
+		</form>
+
+		<button class="btn mobileBtn" id="mobileBtn" type="button" aria-controls="drawer" aria-expanded="false">Menü</button>
+
+
+      </div>
+
+      
+
+      <progress id="scrollProgress" class="scroll-progress" max="100" value="0" aria-hidden="true"></progress>
+    </header>
+
+    <nav class="mega" id="mega" aria-label="Themen" hidden>
+  <div class="mega-scrim" id="megaScrim" aria-hidden="true"></div>
+  <div class="mega-inner" tabindex="-1">
+    <div class="mega-head">
+      <h2 id="megaTitle" class="mega-dialog-title">Themen</h2>
+      <button class="btn" id="closeMega" type="button">Schließen</button>
+    </div>
+
+    <div class="mega-grid mega-grid-3">
+      <div class="mega-intro" aria-label="Schnellstart">
+        <div class="kicker">Schnellstart</div>
+        <a class="mega-quick" href="/start/">Start</a>
+        <a class="mega-quick" href="/anbieter/">Anbieter</a>
+        <a class="mega-quick" href="/start/checkliste/">Checkliste</a>
+        <a class="mega-quick" href="/wizard/">Wizard‑Plan</a>
+        <a class="mega-quick" href="/start/empfehlungen-nach-level/">Empfehlung nach Level</a>
+        <a class="mega-quick" href="/start/bedrohungsmodell/">Threat‑Model</a>
+        <div class="mega-hint">Tipp: Nutze die Suche für konkrete Begriffe.</div>
+      </div>
+
+      <div class="mega-columns" aria-label="Themenbereiche">
+        <div class="mega-col">
+          <div class="mega-col-title">
+            <span class="mega-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="7" y="2" width="10" height="20" rx="2"></rect>
+                <path d="M11 18h2"></path>
+              </svg>
+            </span>
+            Geräte & Systeme
+          </div>
+          <div class="mega-links">
+            {devicesGroup.map((it) => {
+  const kids = directChildren(it.href);
+  const active = isInPath(it.href);
+  let linkClass = 'mega-link';
+  if (active) linkClass += ' active';
+  let openVal = undefined;
+  if (active) openVal = true;
+  if (kids.length) return (
+    <details class="mega-item" open={openVal}>
+      <summary class={linkClass}>
+        <span class="mega-item-icon" aria-hidden="true" set:html={iconForHref(it.href)} />
+        <span class="mega-link-label">{prettyNavLabel(it.label)}</span>
+        <span class="mega-caret" aria-hidden="true">▾</span>
+      </summary>
+      <ul class="mega-sub" role="list">
+        <li><a class="mega-sub-link" href={it.href}>Übersicht</a></li>
+        {kids.map((c) => (
+          <li><a class="mega-sub-link" href={c.href}>{prettyNavLabel(c.label || c.href)}</a></li>
+        ))}
+      </ul>
+    </details>
+  );
+  return (
+    <a class={linkClass} href={it.href}>
+      <span class="mega-item-icon" aria-hidden="true" set:html={iconForHref(it.href)} />
+      <span class="mega-link-label">{prettyNavLabel(it.label)}</span>
+    </a>
+  );
+})}
+          </div>
+        </div>
+
+        <div class="mega-col">
+          <div class="mega-col-title">
+            <span class="mega-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="9"></circle>
+                <path d="M3 12h18"></path>
+                <path d="M12 3a15 15 0 0 1 0 18"></path>
+                <path d="M12 3a15 15 0 0 0 0 18"></path>
+              </svg>
+            </span>
+            Web & Kommunikation
+          </div>
+          <div class="mega-links">
+            {webGroup.map((it) => {
+  const kids = directChildren(it.href);
+  const active = isInPath(it.href);
+  let linkClass = 'mega-link';
+  if (active) linkClass += ' active';
+  let openVal = undefined;
+  if (active) openVal = true;
+  if (kids.length) return (
+    <details class="mega-item" open={openVal}>
+      <summary class={linkClass}>
+        <span class="mega-item-icon" aria-hidden="true" set:html={iconForHref(it.href)} />
+        <span class="mega-link-label">{prettyNavLabel(it.label)}</span>
+        <span class="mega-caret" aria-hidden="true">▾</span>
+      </summary>
+	      <ul class="mega-sub" role="list">
+	        <li><a class="mega-sub-link" href={it.href}>Übersicht</a></li>
+	        {kids.map((c) => (
+          <li><a class="mega-sub-link" href={c.href}>{prettyNavLabel(c.label || c.href)}</a></li>
+	        ))}
+	      </ul>
+    </details>
+  );
+  return (
+    <a class={linkClass} href={it.href}>
+      <span class="mega-item-icon" aria-hidden="true" set:html={iconForHref(it.href)} />
+      <span class="mega-link-label">{prettyNavLabel(it.label)}</span>
+    </a>
+  );
+})}
+          </div>
+        </div>
+
+        <div class="mega-col">
+          <div class="mega-col-title">
+            <span class="mega-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V6l8-4z"></path>
+                <path d="M9.5 12l1.8 1.8L15.5 9.7"></path>
+              </svg>
+            </span>
+            Schutz & Grundlagen
+          </div>
+          <div class="mega-links">
+            {securityGroup.map((it) => {
+  const kids = directChildren(it.href);
+  const active = isInPath(it.href);
+  let linkClass = 'mega-link';
+  if (active) linkClass += ' active';
+  let openVal = undefined;
+  if (active) openVal = true;
+  if (kids.length) return (
+    <details class="mega-item" open={openVal}>
+      <summary class={linkClass}>
+        <span class="mega-item-icon" aria-hidden="true" set:html={iconForHref(it.href)} />
+        <span class="mega-link-label">{prettyNavLabel(it.label)}</span>
+        <span class="mega-caret" aria-hidden="true">▾</span>
+      </summary>
+	      <ul class="mega-sub" role="list">
+	        <li><a class="mega-sub-link" href={it.href}>Übersicht</a></li>
+	        {kids.map((c) => (
+          <li><a class="mega-sub-link" href={c.href}>{prettyNavLabel(c.label || c.href)}</a></li>
+	        ))}
+	      </ul>
+    </details>
+  );
+  return (
+    <a class={linkClass} href={it.href}>
+      <span class="mega-item-icon" aria-hidden="true" set:html={iconForHref(it.href)} />
+      <span class="mega-link-label">{prettyNavLabel(it.label)}</span>
+    </a>
+  );
+})}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mega-footer">
+      <a class="mega-all" href="/verzeichnis/">Alle Themen ansehen</a>
+    </div>
+  </div>
+</nav>
+
+    <nav class="mega" id="megaWissen" aria-label="Wissen" hidden>
+  <div class="mega-scrim" id="megaWissenScrim" aria-hidden="true"></div>
+  <div class="mega-inner" tabindex="-1">
+    <div class="mega-head">
+      <h2 id="megaWissenTitle" class="mega-dialog-title">Wissen</h2>
+      <button class="btn" id="closeMegaWissen" type="button">Schließen</button>
+    </div>
+
+    <div class="mega-grid mega-grid-simple">
+      <div class="mega-intro" aria-label="Kurz erklärt">
+        <div class="kicker">Kurz erklärt</div>
+        <a class="mega-quick" href="/wissen/">Überblick</a>
+        <a class="mega-quick" href="/wissen/bedrohungsmodell/">Bedrohungsmodell</a>
+        <a class="mega-quick" href="/wissen/begriffe/">Begriffe</a>
+        <a class="mega-quick" href="/wissen/faq/">FAQ</a>
+        <div class="mega-hint">Definitionen, Modelle, Hintergründe – kurz & prüfbar.</div>
+      </div>
+
+      <div class="mega-chapters" aria-label="Wissen-Inhalte">
+        <div class="kicker">Wissen</div>
+        <div class="mega-links">
+          {wissenLinksDedup.map((it) => {
+            const active = isInPath(it.href);
+            let linkClass = 'mega-link';
+            if (active) linkClass += ' active';
+            return (
+              <a class={linkClass} href={it.href}>
+                <span class="mega-item-icon" aria-hidden="true" set:html={iconForHref(it.href)} />
+                <span class="mega-link-label">{prettyNavLabel(it.label)}</span>
+              </a>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  </div>
+</nav>
+
+    <nav class="mega" id="megaTests" aria-label="Tests" hidden>
+  <div class="mega-scrim" id="megaTestsScrim" aria-hidden="true"></div>
+  <div class="mega-inner" tabindex="-1">
+    <div class="mega-head">
+      <h2 id="megaTestsTitle" class="mega-dialog-title">Tests</h2>
+      <button class="btn" id="closeMegaTests" type="button">Schließen</button>
+    </div>
+
+    <div class="mega-grid mega-grid-simple">
+      <div class="mega-intro" aria-label="Schnelltests">
+        <div class="kicker">Schnelltests</div>
+        <a class="mega-quick" href="/tests/">Überblick</a>
+        <a class="mega-quick" href="/tests/browser-check/">Browser Check</a>
+        <a class="mega-quick" href="/tests/dns-leak-test/">DNS-Leak-Test</a>
+        <a class="mega-quick" href="/tests/ip-leak-test/">IP-Leak-Test</a>
+        <div class="mega-hint">Tipp: Für Vergleichstests ein frisches Browserprofil nutzen.</div>
+      </div>
+
+      <div class="mega-chapters" aria-label="Testwerkzeuge">
+        <div class="kicker">Tests</div>
+        <div class="mega-links">
+          {testsLinksDedup.map((it) => {
+            const active = isInPath(it.href);
+            let linkClass = 'mega-link';
+            if (active) linkClass += ' active';
+            return (
+              <a class={linkClass} href={it.href}>
+                <span class="mega-item-icon" aria-hidden="true" set:html={iconForHref(it.href)} />
+                <span class="mega-link-label">{prettyNavLabel(it.label)}</span>
+              </a>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  </div>
+</nav>
+
+    <div class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
+      <div class="backdrop"></div>
+      <div class="panel" tabindex="-1">
+        <div class="drawer-head">
+          <h3 class="drawer-title" id="drawerTitle">Menü</h3>
+          <button class="btn" id="closeDrawer" type="button">Schließen</button>
+        </div>
+        <div class="hr"></div>
+
+        <!-- Mobile search (optional fallback; header search is also visible) -->
+        <form class="drawer-search" action="/start/" method="get" role="search" aria-label="Suche">
+          <div class="search-row">
+            <input id="siteSearchMobile" name="q" type="search" placeholder="Suche…" aria-label="Suche" autocomplete="off" />
+            <label class="sr-only" for="siteSearchScopeMobile">Bereich</label>
+            <select id="siteSearchScopeMobile" name="t" aria-label="Bereich">
+
+              
+            <option value="all">Alles</option>
+            <option value="start">Start</option>
+            <option value="themen">Themen</option>
+            <option value="privacy">Privacy Check</option>
+            <option value="anbieter">Anbieter</option>
+            <option value="szenarien">Szenarien</option>
+            <option value="wissen">Wissen</option>
+            <option value="tests">Tests</option>
+          </select>
+          </div>
+          <button class="sr-only" type="submit">Suchen</button>
+          <div id="searchResultsMobile" class="search-results" aria-label="Suchergebnisse"></div>
+          <noscript><div class="no-js-note muted">Suche ohne JavaScript: gib einen Begriff ein und drücke Enter.</div></noscript>
+        </form>
+
+        <div class="hr"></div>
+
+        <div class="drawer-group">
+  <div class="kicker">Schnellstart</div>
+  <div class="drawer-list">
+    <a class="mega-link" href="/start/">Start</a>
+    <a class="mega-link" href="/anbieter/">Anbieter</a>
+    <a class="mega-link" href="/start/checkliste/">30–60 Minuten: Checkliste</a>
+    <a class="mega-link" href="/wizard/">2 Minuten: Wizard‑Plan</a>
+    <a class="mega-link" href="/start/empfehlungen-nach-level/">Empfehlung nach Level</a>
+    <a class="mega-link" href="/start/bedrohungsmodell/">3 Minuten: Threat‑Model</a>
+    <a class="mega-link" href="/tests/">Selbsttests: Leaks prüfen</a>
+  </div>
+</div>
+
+<div class="hr"></div>
+
+
+<div class="drawer-group">
+  <div class="kicker">Kapitel</div>
+  <div class="drawer-accordion" aria-label="Kapitel">
+    {mainChapterCols.map((col) => (
+      <details class={["drawer-col", String(col.title).toLowerCase() === "themen" && "drawer-col-themen"].filter(Boolean).join(" ")} open={isInPath(chapterRootForCol(col)) || undefined}>
+        <summary class="drawer-summary">
+          <span class="drawer-summary-title">{prettyNavLabel(col.title)}</span>
+          <span class="drawer-summary-count" aria-label={`${col.items.length} Themen`} title={`${col.items.length} Themen`}>{col.items.length}</span>
+        </summary>
+        <div class="drawer-col-body">
+          <a
+            class={['mega-link', isExact(chapterRootForCol(col)) && 'active'].filter(Boolean).join(' ')}
+            href={chapterRootForCol(col)}
+            aria-current={isExact(chapterRootForCol(col)) && 'page'}
+          >Übersicht</a>
+
+          {String(col.title).toLowerCase() === 'themen' && (
+  <>
+    {col.items.map((it) => {
+      const h = norm(it.href);
+      const isPlatformChild = h.startsWith('/plattformen/') && h !== '/plattformen/';
+      const kids = isPlatformChild ? directChildren(h) : [];
+
+      if (isPlatformChild && kids.length > 0) {
+        return (
+          <details class="drawer-sub drawer-indent" open={isInPath(it.href) || undefined}>
+            <summary class="drawer-sub-summary">
+              <a
+                class={['mega-link', 'drawer-sub-parent', isExact(it.href) && 'active'].filter(Boolean).join(' ')}
+                href={it.href}
+                title={prettyNavLabel(it.label)}
+                aria-current={isExact(it.href) && 'page'}
+              >{prettyNavLabel(it.label)}</a>
+              <span class="caret" aria-hidden="true"></span>
+            </summary>
+            <div class="drawer-sub-body">
+              {kids.map((c) => (
+                <a
+                  class={['mega-link', 'drawer-sub-child', isExact(c.href) && 'active'].filter(Boolean).join(' ')}
+                  href={c.href}
+                  title={prettyNavLabel(c.label || c.href)}
+                  aria-current={isExact(c.href) && 'page'}
+                >{prettyNavLabel(c.label || c.href)}</a>
+              ))}
+            </div>
+          </details>
+        );
+      }
+
+      return (
+        <a
+          class={['mega-link', isExact(it.href) && 'active', isPlatformChild && 'drawer-indent'].filter(Boolean).join(' ')}
+          href={it.href}
+          title={prettyNavLabel(it.label)}
+          aria-current={isExact(it.href) && 'page'}
+        >{prettyNavLabel(it.label)}</a>
+      );
+    })}
+    <a class="drawer-more" href="/verzeichnis/">Alle Themen ansehen</a>
+  </>
+)}
+
+{['wissen', 'tests'].includes(String(col.title).toLowerCase()) && (
+  <>
+    {col.items
+      .filter((it) => norm(it.href) !== norm(chapterRootForCol(col)))
+      .map((it) => (
+        <a
+          class={['mega-link', isExact(it.href) && 'active'].filter(Boolean).join(' ')}
+          href={it.href}
+          title={prettyNavLabel(it.label)}
+          aria-current={isExact(it.href) && 'page'}
+        >{prettyNavLabel(it.label)}</a>
+      ))}
+  </>
+)}
+
+{!['themen', 'wissen', 'tests'].includes(String(col.title).toLowerCase()) && (
+  <>
+    {col.items
+      .filter((it) => norm(it.href) !== norm(chapterRootForCol(col)))
+      .slice(0, 7)
+      .map((it) => (
+        <a
+          class={['mega-link', isExact(it.href) && 'active'].filter(Boolean).join(' ')}
+          href={it.href}
+          title={prettyNavLabel(it.label)}
+          aria-current={isExact(it.href) && 'page'}
+        >{prettyNavLabel(it.label)}</a>
+      ))}
+
+    {col.items.length > 7 && (
+      <a class="drawer-more" href="/verzeichnis/">Alle Themen ansehen</a>
+    )}
+  </>
+)}
+</div>
+      </details>
+    ))}
+
+    {moreChapterCols.length > 0 && (
+      <details class="drawer-col drawer-more-col">
+        <summary class="drawer-summary">
+          <span class="drawer-summary-title">Mehr Kapitel</span>
+          <span class="drawer-summary-count" aria-label={`${moreChapterCols.length} Kapitel`} title={`${moreChapterCols.length} Kapitel`}>{moreChapterCols.length}</span>
+        </summary>
+        <div class="drawer-col-body">
+          {moreChapterCols.map((col) => (
+            <a class="mega-link" href={chapterRootForCol(col)} title={prettyNavLabel(col.title)}>{prettyNavLabel(col.title)}</a>
+          ))}
+        </div>
+      </details>
+    )}
+</div>
+</div>
+</div>
+      </div>
+    </div>
+
+    <main id="content" class="wrap">
+      <slot />
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-row">
+        <div class="footer-left">
+          <a href="/impressum/" class="footer-link">Impressum</a>
+          <span class="footer-sep">•</span>
+          <a href="/datenschutz/" class="footer-link">Datenschutz</a>
+          <span class="footer-sep">•</span>
+          <a href="/affiliate-hinweis/" class="footer-link">Affiliate-Hinweis</a>
+          <span class="footer-sep">•</span>
+          <a href="/wissen/quellen/" class="footer-link">Methodik & Quellen</a>
+        </div>
+        <div class="footer-right" aria-label="Schnelle Einstiege">
+          <a href="/start/schnellstart/" class="footer-link">Schnellstart</a>
+          <span class="footer-sep">•</span>
+          <a href="/wizard/" class="footer-link">Wizard</a>
+          <span class="footer-sep">•</span>
+          <a href="/privacy-check/level-1/" class="footer-link">Privacy-Check</a>
+          <span class="footer-sep">•</span>
+          <a href="/tests/" class="footer-link">Tests</a>
+          <span class="footer-sep">•</span>
+          <a href="/verzeichnis/" class="footer-link">Alle Themen</a>
+        </div>
+      </div>
+
+      <div class="container footer-row footer-center">
+        <span class="footer-copy">© PrivacyBasics</span>
+      </div>
+
+      <!-- Privacy Promise: sichtbar & konsistent zum Datenschutz -->
+      <div class="container footer-promise" aria-label="Privacy Versprechen">
+        <div class="promise-inline">
+          <span class="promise-badge">Privacy Versprechen</span>
+          <div class="promise-items" aria-label="Privacy Versprechen Details">
+            <span>Keine Cookies</span>
+            <span>Kein LocalStorage</span>
+            <span>Keine Drittanbieter-Skripte</span>
+            <span>DNT/GPC wird respektiert</span>
+            <span>Nur anonyme Counter (aggregiert)</span>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <div class="backtotop" id="backToTop">
+      <button type="button" aria-label="Nach oben">Nach oben</button>
+    </div>
+
+    <!-- Privacy-first analytics: aggregated counter only (no cookies/IDs) -->
+    <AnalyticsBeacon />
+
+    <script src={navUrl} defer></script>
+    <script src={searchUrl} defer></script>
+    <script src={hotkeysUrl} defer></script>
+    <script src={pfadUrl} defer></script>
+  </body>
+</html>

@@ -1,0 +1,14 @@
+---
+// Privacy-first: server-side counter via 1×1 GIF (no JS, no cookies)
+// Respects DNT automatically on server side.
+const path = Astro.url.pathname;
+---
+<img
+  src={`/analytics/pv.php?path=${encodeURIComponent(path)}`}
+  width="1"
+  height="1"
+  alt=""
+  loading="eager"
+  referrerpolicy="no-referrer"
+  class="analytics-beacon"
+/>

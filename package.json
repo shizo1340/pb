@@ -1,0 +1,22 @@
+{
+  "name": "astrosite",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "postbuild": "node scripts/qa-dist-scan.mjs",
+    "preview": "astro preview",
+    "check": "astro check",
+    "prebuild": "node scripts/validate-content.mjs && node scripts/quality-checks.mjs && node scripts/qa-scan.mjs && node scripts/build-search-index.mjs && node scripts/build-sitemap.mjs && node scripts/sanity-check.mjs",
+    "quality": "node scripts/quality-checks.mjs"
+  },
+  "dependencies": {
+    "astro": "^4.16.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.0",
+    "typescript": "^5.6.0"
+  }
+}

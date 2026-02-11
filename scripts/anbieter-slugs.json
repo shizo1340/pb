@@ -1,0 +1,1072 @@
+[
+  {
+    "name": "DNS4EU",
+    "slug": "dns4eu",
+    "category": "DNS"
+  },
+  {
+    "name": "Quad9",
+    "slug": "quad9",
+    "category": "DNS"
+  },
+  {
+    "name": "Cloudflare 1.1.1.1",
+    "slug": "cloudflare-1-1-1-1",
+    "category": "DNS"
+  },
+  {
+    "name": "Google Public DNS",
+    "slug": "google-public-dns",
+    "category": "DNS"
+  },
+  {
+    "name": "NextDNS",
+    "slug": "nextdns",
+    "category": "DNS"
+  },
+  {
+    "name": "AdGuard DNS",
+    "slug": "adguard-dns",
+    "category": "DNS"
+  },
+  {
+    "name": "Control D",
+    "slug": "control-d",
+    "category": "DNS"
+  },
+  {
+    "name": "CleanBrowsing",
+    "slug": "cleanbrowsing",
+    "category": "DNS"
+  },
+  {
+    "name": "OpenDNS (Cisco)",
+    "slug": "opendns",
+    "category": "DNS"
+  },
+  {
+    "name": "UncensoredDNS",
+    "slug": "uncensoreddns",
+    "category": "DNS"
+  },
+  {
+    "name": "LibreDNS",
+    "slug": "libredns",
+    "category": "DNS"
+  },
+  {
+    "name": "DNS.WATCH",
+    "slug": "dns-watch",
+    "category": "DNS"
+  },
+  {
+    "name": "dnsforge.de",
+    "slug": "dnsforge",
+    "category": "DNS"
+  },
+  {
+    "name": "deSEC (authoritative DNS hosting)",
+    "slug": "desec",
+    "category": "DNS"
+  },
+  {
+    "name": "RethinkDNS",
+    "slug": "rethinkdns",
+    "category": "DNS"
+  },
+  {
+    "name": "Mullvad VPN",
+    "slug": "mullvad-vpn",
+    "category": "VPN"
+  },
+  {
+    "name": "IVPN",
+    "slug": "ivpn",
+    "category": "VPN"
+  },
+  {
+    "name": "Proton VPN",
+    "slug": "proton-vpn",
+    "category": "VPN"
+  },
+  {
+    "name": "Windscribe",
+    "slug": "windscribe",
+    "category": "VPN"
+  },
+  {
+    "name": "Mozilla VPN",
+    "slug": "mozilla-vpn",
+    "category": "VPN"
+  },
+  {
+    "name": "PrivadoVPN",
+    "slug": "privadovpn",
+    "category": "VPN"
+  },
+  {
+    "name": "Obscura VPN",
+    "slug": "obscura-vpn",
+    "category": "VPN"
+  },
+  {
+    "name": "NordVPN",
+    "slug": "nordvpn",
+    "category": "VPN"
+  },
+  {
+    "name": "ExpressVPN",
+    "slug": "expressvpn",
+    "category": "VPN"
+  },
+  {
+    "name": "Surfshark",
+    "slug": "surfshark",
+    "category": "VPN"
+  },
+  {
+    "name": "Private Internet Access (PIA)",
+    "slug": "private-internet-access",
+    "category": "VPN"
+  },
+  {
+    "name": "CyberGhost",
+    "slug": "cyberghost",
+    "category": "VPN"
+  },
+  {
+    "name": "TunnelBear",
+    "slug": "tunnelbear",
+    "category": "VPN"
+  },
+  {
+    "name": "hide.me",
+    "slug": "hide-me",
+    "category": "VPN"
+  },
+  {
+    "name": "AirVPN",
+    "slug": "airvpn",
+    "category": "VPN"
+  },
+  {
+    "name": "Perfect Privacy",
+    "slug": "perfect-privacy",
+    "category": "VPN"
+  },
+  {
+    "name": "AzireVPN",
+    "slug": "azirevpn",
+    "category": "VPN"
+  },
+  {
+    "name": "OVPN",
+    "slug": "ovpn",
+    "category": "VPN"
+  },
+  {
+    "name": "RiseupVPN",
+    "slug": "riseupvpn",
+    "category": "VPN"
+  },
+  {
+    "name": "Outline VPN",
+    "slug": "outline-vpn",
+    "category": "VPN"
+  },
+  {
+    "name": "Orbot (Tor for Android)",
+    "slug": "orbot",
+    "category": "Tor & Anonymität"
+  },
+  {
+    "name": "Tor Project",
+    "slug": "tor-project",
+    "category": "Tor & Anonymität"
+  },
+  {
+    "name": "Tor Browser",
+    "slug": "tor-browser",
+    "category": "Tor & Anonymität"
+  },
+  {
+    "name": "Tails OS",
+    "slug": "tails",
+    "category": "Betriebssysteme"
+  },
+  {
+    "name": "Whonix",
+    "slug": "whonix",
+    "category": "Betriebssysteme"
+  },
+  {
+    "name": "Qubes OS",
+    "slug": "qubes-os",
+    "category": "Betriebssysteme"
+  },
+  {
+    "name": "Proton Mail",
+    "slug": "proton-mail",
+    "category": "E-Mail"
+  },
+  {
+    "name": "Tuta Mail",
+    "slug": "tuta-mail",
+    "category": "E-Mail"
+  },
+  {
+    "name": "Posteo",
+    "slug": "posteo",
+    "category": "E-Mail"
+  },
+  {
+    "name": "mailbox.org",
+    "slug": "mailbox-org",
+    "category": "E-Mail"
+  },
+  {
+    "name": "Mailfence",
+    "slug": "mailfence",
+    "category": "E-Mail"
+  },
+  {
+    "name": "Fastmail",
+    "slug": "fastmail",
+    "category": "E-Mail"
+  },
+  {
+    "name": "StartMail",
+    "slug": "startmail",
+    "category": "E-Mail"
+  },
+  {
+    "name": "Disroot (Community)",
+    "slug": "disroot",
+    "category": "E-Mail"
+  },
+  {
+    "name": "Riseup (Community)",
+    "slug": "riseup-email",
+    "category": "E-Mail"
+  },
+  {
+    "name": "Zoho Mail",
+    "slug": "zoho-mail",
+    "category": "E-Mail"
+  },
+  {
+    "name": "Hushmail",
+    "slug": "hushmail",
+    "category": "E-Mail"
+  },
+  {
+    "name": "Thexyz",
+    "slug": "thexyz",
+    "category": "E-Mail"
+  },
+  {
+    "name": "Private-Mail",
+    "slug": "private-mail",
+    "category": "E-Mail"
+  },
+  {
+    "name": "Gmail",
+    "slug": "gmail",
+    "category": "E-Mail"
+  },
+  {
+    "name": "Outlook.com",
+    "slug": "outlook-com",
+    "category": "E-Mail"
+  },
+  {
+    "name": "iCloud Mail",
+    "slug": "icloud-mail",
+    "category": "E-Mail"
+  },
+  {
+    "name": "SimpleLogin",
+    "slug": "simplelogin",
+    "category": "E-Mail-Aliasing"
+  },
+  {
+    "name": "addy.io",
+    "slug": "addy-io",
+    "category": "E-Mail-Aliasing"
+  },
+  {
+    "name": "Firefox Relay",
+    "slug": "firefox-relay",
+    "category": "E-Mail-Aliasing"
+  },
+  {
+    "name": "DuckDuckGo E-Mail Protection",
+    "slug": "duckduckgo-email-protection",
+    "category": "E-Mail-Aliasing"
+  },
+  {
+    "name": "Forward E-Mail",
+    "slug": "forward-email",
+    "category": "E-Mail-Aliasing"
+  },
+  {
+    "name": "Fastmail Masked E-Mail",
+    "slug": "fastmail-masked-email",
+    "category": "E-Mail-Aliasing"
+  },
+  {
+    "name": "iCloud Hide My E-Mail",
+    "slug": "icloud-hide-my-email",
+    "category": "E-Mail-Aliasing"
+  },
+  {
+    "name": "33Mail",
+    "slug": "33mail",
+    "category": "E-Mail-Aliasing"
+  },
+  {
+    "name": "AnonAddy (legacy name)",
+    "slug": "anonaddy",
+    "category": "E-Mail-Aliasing"
+  },
+  {
+    "name": "Mailinator (Temp Mail)",
+    "slug": "mailinator",
+    "category": "E-Mail-Aliasing"
+  },
+  {
+    "name": "Guerrilla Mail (Temp Mail)",
+    "slug": "guerrilla-mail",
+    "category": "E-Mail-Aliasing"
+  },
+  {
+    "name": "Bitwarden",
+    "slug": "bitwarden",
+    "category": "Passwort-Manager"
+  },
+  {
+    "name": "KeePass",
+    "slug": "keepass",
+    "category": "Passwort-Manager"
+  },
+  {
+    "name": "KeePassXC",
+    "slug": "keepassxc",
+    "category": "Passwort-Manager"
+  },
+  {
+    "name": "1Password",
+    "slug": "1password",
+    "category": "Passwort-Manager"
+  },
+  {
+    "name": "Proton Pass",
+    "slug": "proton-pass",
+    "category": "Passwort-Manager"
+  },
+  {
+    "name": "Dashlane",
+    "slug": "dashlane",
+    "category": "Passwort-Manager"
+  },
+  {
+    "name": "LastPass",
+    "slug": "lastpass",
+    "category": "Passwort-Manager"
+  },
+  {
+    "name": "Enpass",
+    "slug": "enpass",
+    "category": "Passwort-Manager"
+  },
+  {
+    "name": "NordPass",
+    "slug": "nordpass",
+    "category": "Passwort-Manager"
+  },
+  {
+    "name": "RoboForm",
+    "slug": "roboform",
+    "category": "Passwort-Manager"
+  },
+  {
+    "name": "Keeper",
+    "slug": "keeper",
+    "category": "Passwort-Manager"
+  },
+  {
+    "name": "Strongbox (iOS)",
+    "slug": "strongbox",
+    "category": "Passwort-Manager"
+  },
+  {
+    "name": "Aegis Authenticator",
+    "slug": "aegis",
+    "category": "2FA"
+  },
+  {
+    "name": "2FAS",
+    "slug": "2fas",
+    "category": "2FA"
+  },
+  {
+    "name": "Ente Auth",
+    "slug": "ente-auth",
+    "category": "2FA"
+  },
+  {
+    "name": "Authy",
+    "slug": "authy",
+    "category": "2FA"
+  },
+  {
+    "name": "Google Authenticator",
+    "slug": "google-authenticator",
+    "category": "2FA"
+  },
+  {
+    "name": "Microsoft Authenticator",
+    "slug": "microsoft-authenticator",
+    "category": "2FA"
+  },
+  {
+    "name": "FreeOTP",
+    "slug": "freeotp",
+    "category": "2FA"
+  },
+  {
+    "name": "YubiKey",
+    "slug": "yubikey",
+    "category": "Security-Key"
+  },
+  {
+    "name": "Nitrokey",
+    "slug": "nitrokey",
+    "category": "Security-Key"
+  },
+  {
+    "name": "SoloKey",
+    "slug": "solokey",
+    "category": "Security-Key"
+  },
+  {
+    "name": "Google Titan Security Key",
+    "slug": "google-titan-security-key",
+    "category": "Security-Key"
+  },
+  {
+    "name": "OnlyKey",
+    "slug": "onlykey",
+    "category": "Security-Key"
+  },
+  {
+    "name": "Feitian Security Keys",
+    "slug": "feitian-security-keys",
+    "category": "Security-Key"
+  },
+  {
+    "name": "Signal",
+    "slug": "signal",
+    "category": "Messenger"
+  },
+  {
+    "name": "WhatsApp",
+    "slug": "whatsapp",
+    "category": "Messenger"
+  },
+  {
+    "name": "Telegram",
+    "slug": "telegram",
+    "category": "Messenger"
+  },
+  {
+    "name": "iMessage",
+    "slug": "imessage",
+    "category": "Messenger"
+  },
+  {
+    "name": "Session",
+    "slug": "session",
+    "category": "Messenger"
+  },
+  {
+    "name": "SimpleX Chat",
+    "slug": "simplex-chat",
+    "category": "Messenger"
+  },
+  {
+    "name": "Threema",
+    "slug": "threema",
+    "category": "Messenger"
+  },
+  {
+    "name": "Wire",
+    "slug": "wire",
+    "category": "Messenger"
+  },
+  {
+    "name": "Element (Matrix client)",
+    "slug": "element",
+    "category": "Messenger"
+  },
+  {
+    "name": "Matrix (Protokoll)",
+    "slug": "matrix",
+    "category": "Messenger"
+  },
+  {
+    "name": "Briar",
+    "slug": "briar",
+    "category": "Messenger"
+  },
+  {
+    "name": "Beeper",
+    "slug": "beeper",
+    "category": "Messenger"
+  },
+  {
+    "name": "Discord",
+    "slug": "discord",
+    "category": "Messenger"
+  },
+  {
+    "name": "Facebook Messenger",
+    "slug": "facebook-messenger",
+    "category": "Messenger"
+  },
+  {
+    "name": "Slack",
+    "slug": "slack",
+    "category": "Messenger"
+  },
+  {
+    "name": "Microsoft Teams",
+    "slug": "microsoft-teams",
+    "category": "Messenger"
+  },
+  {
+    "name": "Zoom",
+    "slug": "zoom",
+    "category": "Video & Meetings"
+  },
+  {
+    "name": "Jitsi Meet",
+    "slug": "jitsi-meet",
+    "category": "Video & Meetings"
+  },
+  {
+    "name": "Google Meet",
+    "slug": "google-meet",
+    "category": "Video & Meetings"
+  },
+  {
+    "name": "Firefox",
+    "slug": "firefox",
+    "category": "Browser"
+  },
+  {
+    "name": "Brave",
+    "slug": "brave",
+    "category": "Browser"
+  },
+  {
+    "name": "Mullvad Browser",
+    "slug": "mullvad-browser",
+    "category": "Browser"
+  },
+  {
+    "name": "LibreWolf",
+    "slug": "librewolf",
+    "category": "Browser"
+  },
+  {
+    "name": "Ungoogled Chromium",
+    "slug": "ungoogled-chromium",
+    "category": "Browser"
+  },
+  {
+    "name": "Vivaldi",
+    "slug": "vivaldi",
+    "category": "Browser"
+  },
+  {
+    "name": "Safari",
+    "slug": "safari",
+    "category": "Browser"
+  },
+  {
+    "name": "Google Chrome",
+    "slug": "google-chrome",
+    "category": "Browser"
+  },
+  {
+    "name": "Microsoft Edge",
+    "slug": "microsoft-edge",
+    "category": "Browser"
+  },
+  {
+    "name": "DuckDuckGo",
+    "slug": "duckduckgo",
+    "category": "Suche"
+  },
+  {
+    "name": "Startpage",
+    "slug": "startpage",
+    "category": "Suche"
+  },
+  {
+    "name": "Brave Search",
+    "slug": "brave-search",
+    "category": "Suche"
+  },
+  {
+    "name": "Qwant",
+    "slug": "qwant",
+    "category": "Suche"
+  },
+  {
+    "name": "Mojeek",
+    "slug": "mojeek",
+    "category": "Suche"
+  },
+  {
+    "name": "Kagi",
+    "slug": "kagi",
+    "category": "Suche"
+  },
+  {
+    "name": "Ecosia",
+    "slug": "ecosia",
+    "category": "Suche"
+  },
+  {
+    "name": "Swisscows",
+    "slug": "swisscows",
+    "category": "Suche"
+  },
+  {
+    "name": "MetaGer",
+    "slug": "metager",
+    "category": "Suche"
+  },
+  {
+    "name": "SearXNG",
+    "slug": "searxng",
+    "category": "Suche"
+  },
+  {
+    "name": "Perplexity",
+    "slug": "perplexity",
+    "category": "Suche"
+  },
+  {
+    "name": "You.com",
+    "slug": "you-com",
+    "category": "Suche"
+  },
+  {
+    "name": "Google Search",
+    "slug": "google-search",
+    "category": "Suche"
+  },
+  {
+    "name": "Bing",
+    "slug": "bing",
+    "category": "Suche"
+  },
+  {
+    "name": "OpenStreetMap",
+    "slug": "openstreetmap",
+    "category": "Karten & Navigation"
+  },
+  {
+    "name": "Organic Maps",
+    "slug": "organic-maps",
+    "category": "Karten & Navigation"
+  },
+  {
+    "name": "OsmAnd",
+    "slug": "osmand",
+    "category": "Karten & Navigation"
+  },
+  {
+    "name": "Magic Earth",
+    "slug": "magic-earth",
+    "category": "Karten & Navigation"
+  },
+  {
+    "name": "HERE WeGo",
+    "slug": "here-wego",
+    "category": "Karten & Navigation"
+  },
+  {
+    "name": "Apple Maps",
+    "slug": "apple-maps",
+    "category": "Karten & Navigation"
+  },
+  {
+    "name": "Google Maps",
+    "slug": "google-maps",
+    "category": "Karten & Navigation"
+  },
+  {
+    "name": "Waze",
+    "slug": "waze",
+    "category": "Karten & Navigation"
+  },
+  {
+    "name": "Nextcloud",
+    "slug": "nextcloud",
+    "category": "Cloud & Sync"
+  },
+  {
+    "name": "Proton Drive",
+    "slug": "proton-drive",
+    "category": "Cloud & Sync"
+  },
+  {
+    "name": "Tresorit",
+    "slug": "tresorit",
+    "category": "Cloud & Sync"
+  },
+  {
+    "name": "Sync.com",
+    "slug": "sync-com",
+    "category": "Cloud & Sync"
+  },
+  {
+    "name": "MEGA",
+    "slug": "mega",
+    "category": "Cloud & Sync"
+  },
+  {
+    "name": "pCloud",
+    "slug": "pcloud",
+    "category": "Cloud & Sync"
+  },
+  {
+    "name": "Koofr",
+    "slug": "koofr",
+    "category": "Cloud & Sync"
+  },
+  {
+    "name": "Dropbox",
+    "slug": "dropbox",
+    "category": "Cloud & Sync"
+  },
+  {
+    "name": "Google Drive",
+    "slug": "google-drive",
+    "category": "Cloud & Sync"
+  },
+  {
+    "name": "OneDrive",
+    "slug": "onedrive",
+    "category": "Cloud & Sync"
+  },
+  {
+    "name": "iCloud Drive",
+    "slug": "icloud-drive",
+    "category": "Cloud & Sync"
+  },
+  {
+    "name": "Backblaze",
+    "slug": "backblaze",
+    "category": "Backup"
+  },
+  {
+    "name": "SpiderOak One",
+    "slug": "spideroak-one",
+    "category": "Backup"
+  },
+  {
+    "name": "Arq Backup",
+    "slug": "arq-backup",
+    "category": "Backup"
+  },
+  {
+    "name": "BorgBackup",
+    "slug": "borgbackup",
+    "category": "Backup"
+  },
+  {
+    "name": "Restic",
+    "slug": "restic",
+    "category": "Backup"
+  },
+  {
+    "name": "Duplicati",
+    "slug": "duplicati",
+    "category": "Backup"
+  },
+  {
+    "name": "Syncthing",
+    "slug": "syncthing",
+    "category": "Cloud & Sync"
+  },
+  {
+    "name": "Cryptomator",
+    "slug": "cryptomator",
+    "category": "Verschlüsselung"
+  },
+  {
+    "name": "VeraCrypt",
+    "slug": "veracrypt",
+    "category": "Verschlüsselung"
+  },
+  {
+    "name": "rclone",
+    "slug": "rclone",
+    "category": "Cloud & Sync"
+  },
+  {
+    "name": "Standard Notes",
+    "slug": "standard-notes",
+    "category": "Notizen & Docs"
+  },
+  {
+    "name": "Joplin",
+    "slug": "joplin",
+    "category": "Notizen & Docs"
+  },
+  {
+    "name": "Notesnook",
+    "slug": "notesnook",
+    "category": "Notizen & Docs"
+  },
+  {
+    "name": "Obsidian",
+    "slug": "obsidian",
+    "category": "Notizen & Docs"
+  },
+  {
+    "name": "Simplenote",
+    "slug": "simplenote",
+    "category": "Notizen & Docs"
+  },
+  {
+    "name": "Evernote",
+    "slug": "evernote",
+    "category": "Notizen & Docs"
+  },
+  {
+    "name": "Notion",
+    "slug": "notion",
+    "category": "Notizen & Docs"
+  },
+  {
+    "name": "Cryptee",
+    "slug": "cryptee",
+    "category": "Notizen & Docs"
+  },
+  {
+    "name": "Matomo",
+    "slug": "matomo",
+    "category": "Analytics"
+  },
+  {
+    "name": "Plausible",
+    "slug": "plausible",
+    "category": "Analytics"
+  },
+  {
+    "name": "Fathom Analytics",
+    "slug": "fathom-analytics",
+    "category": "Analytics"
+  },
+  {
+    "name": "GoatCounter",
+    "slug": "goatcounter",
+    "category": "Analytics"
+  },
+  {
+    "name": "Umami",
+    "slug": "umami",
+    "category": "Analytics"
+  },
+  {
+    "name": "Swetrix",
+    "slug": "swetrix",
+    "category": "Analytics"
+  },
+  {
+    "name": "Simple Analytics",
+    "slug": "simple-analytics",
+    "category": "Analytics"
+  },
+  {
+    "name": "Ackee",
+    "slug": "ackee",
+    "category": "Analytics"
+  },
+  {
+    "name": "Cloudflare Web Analytics",
+    "slug": "cloudflare-web-analytics",
+    "category": "Analytics"
+  },
+  {
+    "name": "Google Analytics",
+    "slug": "google-analytics",
+    "category": "Analytics"
+  },
+  {
+    "name": "uBlock Origin",
+    "slug": "ublock-origin",
+    "category": "Adblock & Tracking"
+  },
+  {
+    "name": "AdGuard",
+    "slug": "adguard",
+    "category": "Adblock & Tracking"
+  },
+  {
+    "name": "Privacy Badger",
+    "slug": "privacy-badger",
+    "category": "Adblock & Tracking"
+  },
+  {
+    "name": "Ghostery",
+    "slug": "ghostery",
+    "category": "Adblock & Tracking"
+  },
+  {
+    "name": "DuckDuckGo Privacy Essentials",
+    "slug": "duckduckgo-privacy-essentials",
+    "category": "Adblock & Tracking"
+  },
+  {
+    "name": "Consent-O-Matic",
+    "slug": "consent-o-matic",
+    "category": "Adblock & Tracking"
+  },
+  {
+    "name": "ClearURLs",
+    "slug": "clearurls",
+    "category": "Adblock & Tracking"
+  },
+  {
+    "name": "NoScript",
+    "slug": "noscript",
+    "category": "Adblock & Tracking"
+  },
+  {
+    "name": "LocalCDN",
+    "slug": "localcdn",
+    "category": "Adblock & Tracking"
+  },
+  {
+    "name": "Decentraleyes",
+    "slug": "decentraleyes",
+    "category": "Adblock & Tracking"
+  },
+  {
+    "name": "Pi-hole",
+    "slug": "pi-hole",
+    "category": "Adblock & Tracking"
+  },
+  {
+    "name": "AdGuard Home",
+    "slug": "adguard-home",
+    "category": "Adblock & Tracking"
+  },
+  {
+    "name": "GrapheneOS",
+    "slug": "grapheneos",
+    "category": "Betriebssysteme"
+  },
+  {
+    "name": "CalyxOS",
+    "slug": "calyxos",
+    "category": "Betriebssysteme"
+  },
+  {
+    "name": "LineageOS",
+    "slug": "lineageos",
+    "category": "Betriebssysteme"
+  },
+  {
+    "name": "/e/OS",
+    "slug": "e-os",
+    "category": "Betriebssysteme"
+  },
+  {
+    "name": "Android (AOSP)",
+    "slug": "android-aosp",
+    "category": "Betriebssysteme"
+  },
+  {
+    "name": "iOS",
+    "slug": "ios",
+    "category": "Betriebssysteme"
+  },
+  {
+    "name": "Windows",
+    "slug": "windows",
+    "category": "Betriebssysteme"
+  },
+  {
+    "name": "macOS",
+    "slug": "macos",
+    "category": "Betriebssysteme"
+  },
+  {
+    "name": "Linux (allgemein)",
+    "slug": "linux",
+    "category": "Betriebssysteme"
+  },
+  {
+    "name": "Privacy.com (Virtual Cards)",
+    "slug": "privacy-com",
+    "category": "Zahlungen"
+  },
+  {
+    "name": "Revolut",
+    "slug": "revolut",
+    "category": "Zahlungen"
+  },
+  {
+    "name": "Wise",
+    "slug": "wise",
+    "category": "Zahlungen"
+  },
+  {
+    "name": "PayPal",
+    "slug": "paypal",
+    "category": "Zahlungen"
+  },
+  {
+    "name": "Apple Pay",
+    "slug": "apple-pay",
+    "category": "Zahlungen"
+  },
+  {
+    "name": "Google Pay",
+    "slug": "google-pay",
+    "category": "Zahlungen"
+  },
+  {
+    "name": "Incogni",
+    "slug": "incogni",
+    "category": "Datenbroker Removal"
+  },
+  {
+    "name": "DeleteMe",
+    "slug": "deleteme",
+    "category": "Datenbroker Removal"
+  },
+  {
+    "name": "Optery",
+    "slug": "optery",
+    "category": "Datenbroker Removal"
+  },
+  {
+    "name": "Kanary",
+    "slug": "kanary",
+    "category": "Datenbroker Removal"
+  },
+  {
+    "name": "EasyOptOuts",
+    "slug": "easyoptouts",
+    "category": "Datenbroker Removal"
+  }
+]

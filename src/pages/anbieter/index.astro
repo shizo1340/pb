@@ -1,0 +1,611 @@
+---
+import DocLayout from '../../layouts/DocLayout.astro';
+import taxonomy from '../../data/anbieter-taxonomy.json';
+import anbieterUrl from '../../scripts/anbieter.js?url';
+
+const frontmatter = {
+  title: "Anbieter",
+  description: "Verzeichnis von Tools, Diensten und Projekten rund um Privatsphäre — als Startpunkt zum Vergleichen (kostenlos & bezahlt).",
+  robots: "index,follow",
+  updated: "2026-01-05",
+  chapter: "Anbieter",
+  type: "single",
+  format: "directory",
+  level: "",
+  money: "maybe",
+  status: "done",
+  url: "/anbieter/",
+};
+
+// Load all provider pages (each is /anbieter/<slug>/index.md)
+// Astro.glob is deprecated; use import.meta.glob with eager import.
+const pages = Object.values(import.meta.glob('./*/index.md', { eager: true }));
+
+const alias = taxonomy?.aliases ?? {};
+const catOrder = new Map((taxonomy?.categories ?? []).map((c, i) => [c.label, i]));
+const orderIdx = (label) => (catOrder.has(label) ? catOrder.get(label) : 999);
+
+const normStatus = (s) => String(s || '').trim().toLowerCase();
+
+// Labels for UI (German). Use function declarations so they are hoisted.
+function priceLabel(v) {
+  const key = String(v || '').trim().toLowerCase();
+  return (
+    {
+      free: 'kostenlos',
+      freemium: 'freemium',
+      paid: 'bezahlt',
+      mixed: 'gemischt',
+      unknown: 'unbekannt',
+    }[key] || v || ''
+  );
+}
+
+function triLabel(v) {
+  const key = String(v || '').trim().toLowerCase();
+  return (
+    {
+      yes: 'ja',
+      no: 'nein',
+      partial: 'teilweise',
+      unknown: 'unbekannt',
+    }[key] || v || ''
+  );
+}
+
+function regionLabel(v) {
+  const key = String(v || '').trim().toLowerCase();
+  return (
+    {
+      eu: 'EU/EWR',
+      ch: 'Schweiz',
+      uk: 'UK',
+      us: 'USA',
+      ca: 'Kanada',
+      other: 'Andere',
+      unknown: 'unbekannt',
+    }[key] || v || ''
+  );
+}
+
+function logsLabel(v) {
+  const key = String(v || '').trim().toLowerCase();
+  return (
+    {
+      none: 'keine',
+      minimal: 'minimal',
+      some: 'vorhanden',
+      configurable: 'konfigurierbar',
+      unknown: 'unklar',
+    }[key] || v || ''
+  );
+}
+
+function retentionLabel(v) {
+  const key = String(v || '').trim().toLowerCase();
+  return (
+    {
+      short: '≤7 Tage',
+      mid: '≤30 Tage',
+      long: '≤365 Tage',
+      verylong: '>365 Tage',
+      configurable: 'konfigurierbar',
+      specified: 'angegeben',
+      unknown: 'unklar',
+    }[key] || v || ''
+  );
+}
+
+const items = pages
+  .map((p) => {
+    const fm = p.frontmatter ?? {};
+    const prov = fm.provider ?? {};
+
+    const rawCat = prov.category ?? "";
+    const category = alias[rawCat] ?? rawCat;
+
+    // Audits: ignore placeholders like "Nicht angegeben" so the count stays accurate.
+    const auditsRaw = Array.isArray(prov.audits) ? prov.audits : [];
+    const audits = auditsRaw
+      .map((x) => String(x || '').trim())
+      .filter((x) => {
+        const nx = normStatus(x);
+        return nx && nx !== 'nicht angegeben' && nx !== 'n/a' && nx !== 'na' && nx !== 'none' && nx !== 'unknown';
+      });
+
+    // Canonicalize tri-state fields for filtering.
+    const canonTri = (v) => {
+      const s = String(v || '').trim().toLowerCase();
+      if (!s) return 'unknown';
+      if (['yes', 'ja', 'true', '1', 'required'].includes(s)) return 'yes';
+      if (['no', 'nein', 'false', '0', 'not required'].includes(s)) return 'no';
+      if (s.includes('teil') || s.includes('partial')) return 'partial';
+      if (s.includes('unknown') || s.includes('unklar')) return 'unknown';
+      // Fallback: keep unknown to avoid accidental misclassification.
+      return 'unknown';
+    };
+
+    const canonPrice = (v) => {
+      const s = String(v || '').trim().toLowerCase();
+      if (!s) return 'unknown';
+      if (s === 'free' || s.includes('kostenlos')) return 'free';
+      if (s === 'freemium' || s.includes('free tier')) return 'freemium';
+      if (s === 'paid' || s.includes('bezahlt') || s.includes('paid')) return 'paid';
+      if (s === 'mixed' || s.includes('gemischt')) return 'mixed';
+      if (s.includes('free') && s.includes('paid')) return 'mixed';
+      return ['free', 'freemium', 'paid', 'mixed', 'unknown'].includes(s) ? s : 'unknown';
+    };
+
+const canonRegion = (v) => {
+      const s = String(v || '').trim().toLowerCase();
+      if (!s) return 'unknown';
+
+      if (['eu','ch','uk','us','ca','other','unknown'].includes(s)) return s;
+      if (s.includes('unklar') || s.includes('nicht angegeben') || s.includes('unknown')) return 'unknown';
+
+      const has = (arr) => arr.some((k) => s.includes(k));
+
+      // Non‑EU buckets first
+      if (has(['schweiz', 'switzerland'])) return 'ch';
+      if (has(['vereinigtes königreich', 'united kingdom', 'england', 'wales', 'scotland', 'großbritannien', 'grossbritannien', 'britain', ' gb', 'uk'])) return 'uk';
+      if (has(['usa', 'united states', 'delaware', 'nevada', 'california', 'texas', 'washington', 'new york'])) return 'us';
+      if (has(['kanada', 'canada'])) return 'ca';
+
+      const euKeys = [
+        'eu', 'ewr', 'europe',
+        'deutschland', 'germany', 'österreich', 'austria', 'schweden', 'sweden', 'finnland', 'finland',
+        'dänemark', 'daenemark', 'denmark', 'niederlande', 'netherlands', 'belgien', 'belgium',
+        'frankreich', 'france', 'spanien', 'spain', 'portugal',
+        'italien', 'italy', 'irland', 'ireland',
+        'polen', 'poland', 'tschechien', 'czech', 'slowakei', 'slovakia',
+        'slowenien', 'slovenia', 'ungarn', 'hungary',
+        'rumänien', 'romania', 'bulgarien', 'bulgaria',
+        'kroatien', 'croatia', 'estland', 'estonia', 'lettland', 'latvia', 'litauen', 'lithuania',
+        'griechenland', 'greece', 'zypern', 'cyprus', 'malta', 'luxemburg', 'luxembourg',
+        'norwegen', 'norway', 'island', 'iceland', 'liechtenstein'
+      ];
+      if (has(euKeys)) return 'eu';
+
+      return 'other';
+    };
+
+    const canonLogs = (v) => {
+      const s = String(v || '').trim().toLowerCase();
+      if (!s) return 'unknown';
+      if (s === 'unknown' || s === 'unklar' || s === 'nicht angegeben' || s === 'n/a' || s === 'na') return 'unknown';
+
+
+      if (['none','minimal','some','configurable','unknown'].includes(s)) return s;
+
+      if (s === 'none' || s.includes('keine') || s.includes('no logs') || (s.includes('keine') && s.includes('logs')) || s.includes('keine session')) return 'none';
+      if (s.includes('minimal') || s.includes('anonym') || s.includes('aggreg') || s.includes('crash')) return 'minimal';
+      if (s.includes('configurable') || s.includes('konfigurierbar')) return 'configurable';
+
+      // Default: logs exist, but details vary
+      return 'some';
+    };
+
+    const canonRetention = (v) => {
+      const s = String(v || '').trim().toLowerCase();
+      if (!s) return 'unknown';
+      if (s === 'unknown' || s.includes('unklar') || s.includes('nicht angegeben') || s.includes('n/a')) return 'unknown';
+
+      if (s === 'stated') return 'specified';
+      if (['short','mid','long','verylong','configurable','specified','unknown'].includes(s)) return s;
+      if (s.includes('configurable') || s.includes('konfigurierbar')) return 'configurable';
+      if (s.includes('unbegrenzt') || s.includes('unlimited') || s.includes('indefinite')) return 'verylong';
+
+      // Try to classify common durations (best effort)
+      const re = /(\d+(?:[\.,]\d+)?)\s*(tag|tage|day|days|woche|wochen|week|weeks|monat|monate|month|months|jahr|jahre|year|years|stunde|stunden|hour|hours)\b/g;
+      let maxDays = 0;
+      let matched = false;
+      for (const m of s.matchAll(re)) {
+        matched = true;
+        const num = parseFloat(String(m[1]).replace(',', '.'));
+        const unit = m[2];
+        let days = num;
+        if (unit.startsWith('stunde') || unit.startsWith('hour')) days = num / 24;
+        else if (unit.startsWith('woche') || unit.startsWith('week')) days = num * 7;
+        else if (unit.startsWith('monat') || unit.startsWith('month')) days = num * 30;
+        else if (unit.startsWith('jahr') || unit.startsWith('year')) days = num * 365;
+        // tag/day: as is
+        if (days > maxDays) maxDays = days;
+      }
+
+      if (matched) {
+        if (maxDays <= 7) return 'short';
+        if (maxDays <= 30) return 'mid';
+        if (maxDays <= 365) return 'long';
+        return 'verylong';
+      }
+
+      if (s.includes('sofort') || s.includes('immediately')) return 'short';
+
+      return 'specified';
+    };
+
+    const self_host_possible = canonTri(prov.self_host_possible);
+    const open_source = canonTri(prov.open_source);
+    const account_required = canonTri(prov.account_required);
+    const pricing = canonPrice(prov.pricing);
+
+const jurisdiction = prov.jurisdiction ?? "";
+    const region = canonRegion(prov.region ?? jurisdiction);
+
+    const logs_level = canonLogs(prov.logs_level ?? prov.logs);
+    const retention_level = canonRetention(prov.retention_level ?? prov.retention);
+
+    return {
+      name: prov.name ?? fm.title ?? "(ohne Titel)",
+      category,
+      // Status is usually in frontmatter, but some templates store it under provider.
+      // Accept both, and normalize later when filtering.
+      status: fm.status ?? prov.status ?? "",
+      href: fm.url ?? "",
+      // External website (optional). Used for "Direkt zum Anbieter" on the index page.
+      website:
+        (typeof prov.website === 'string' && /^https?:\/\//i.test(prov.website))
+          ? prov.website
+          : "",
+      pricing,
+      free_tier: canonTri(prov.free_tier),
+      open_source,
+      account_required,
+      audits_count: audits.length || 0,
+      self_host_possible,
+region,
+      logs_level,
+      retention_level,
+      // Precomputed labels for clean client rendering.
+      pricing_label: priceLabel(pricing),
+      open_source_label: triLabel(open_source),
+      account_required_label: triLabel(account_required),
+      self_host_possible_label: triLabel(self_host_possible),
+      region_label: regionLabel(region),
+      logs_label: logsLabel(logs_level),
+      retention_label: retentionLabel(retention_level),
+    };
+  })
+  .filter((it) => Boolean(it.href))
+  // Hide TODO entries from the listing to avoid dead links if TODO pages are removed from dist.
+  .filter((it) => normStatus(it.status) !== 'todo')
+  .sort((a, b) =>
+    (orderIdx(a.category) - orderIdx(b.category)) ||
+    (a.category || '').localeCompare(b.category || '') ||
+    (a.name || '').localeCompare(b.name || '')
+  );
+
+const categories = Array.from(new Set(items.map((i) => i.category).filter(Boolean)))
+  .sort((a, b) => (orderIdx(a) - orderIdx(b)) || a.localeCompare(b));
+
+// Map UI category labels to taxonomy ids so we can link to category landing pages.
+const idByLabel = new Map((taxonomy?.categories ?? []).map((c) => [String(c.label), String(c.id)]));
+const categoryHref = (label) => {
+  const id = idByLabel.get(String(label));
+  return id ? `/anbieter/kategorie/${id}/` : `#cat-${slugify(label)}`;
+};
+
+const hasArchived = items.some((it) => normStatus(it.status) === 'archived');
+
+function slugify(s) {
+  return String(s || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
+
+const groups = new Map();
+for (const it of items) {
+  const cat = it.category || 'Sonstiges';
+  if (!groups.has(cat)) groups.set(cat, []);
+  groups.get(cat).push(it);
+}
+
+const categoryCounts = new Map(categories.map((c) => [c, (groups.get(c) || []).length]));
+
+const TOP_CATS_MAX = 9;
+const topCategories = [...categories]
+  .sort((a, b) => ((categoryCounts.get(b) || 0) - (categoryCounts.get(a) || 0)) || a.localeCompare(b, 'de'))
+  .slice(0, TOP_CATS_MAX);
+
+
+// priceLabel / triLabel moved above (hoisted)
+
+// Badges are factual, not ratings → keep neutral styling.
+const badgeNeutral = () => 'badge-muted';
+
+const statusBadge = (s) => {
+  const st = normStatus(s);
+  if (!st || st === 'done') return '';
+  if (st === 'archived') return 'archiviert';
+  return s;
+};
+---
+
+<DocLayout {...frontmatter}>
+  <div class="anbieter-intro">
+    <p>
+      Dieses Verzeichnis sammelt Tools, Dienste und Projekte rund um Privatsphäre –&nbsp;als <strong>Startpunkt zum Vergleichen</strong>, nicht als „Best-of“-Liste.
+    </p>
+
+		<p class="muted">
+			Nur Affiliate‑Links führen über <code>/go/&lt;slug&gt;</code> und sind zusätzlich mit <em>Direkt&nbsp;*↗</em> markiert – so können Klicks anonym und nur als Gesamtzahl gezählt werden (keine Cookies, keine IDs).
+			Nicht‑Affiliate‑Links sind ganz normale Klarlinks.
+			Details: <a href="/affiliate-hinweis/">Affiliate-Hinweis</a>.
+		</p>
+
+    <div class="callout">
+      <p><strong>So nutzt du die Seite am schnellsten:</strong></p>
+      <ul>
+        <li>Suche nach Namen oder Stichworten (z. B. „DNS“, „Alias“, „Messenger“).</li>
+        <li>Filtere nach <strong>Kategorie</strong>, <strong>Preis</strong>, <strong>Open Source</strong>, <strong>Konto</strong>, <strong>Region</strong>, <strong>Logs</strong>, <strong>Retention</strong>, <strong>Audits</strong> und <strong>Self-Hosting</strong>.</li>
+        <!-- Anbieter-Audit-Index bewusst entfernt (kein Ranking/Red-Flags-Index). -->
+      </ul>
+    </div>
+
+    <div class="callout">
+  <p><strong>Top-Kategorien:</strong> Schneller Einstieg in häufige Entscheidungen.</p>
+  <nav class="anbieter-quickcats" aria-label="Top-Kategorien">
+    <div class="quickcats-row">
+      {topCategories.map((c) => (
+        <a class="chip" href={categoryHref(c)}>
+          {c}{categoryCounts.get(c) ? <span class="muted"> ({categoryCounts.get(c)})</span> : null}
+        </a>
+      ))}
+    </div>
+  </nav>
+</div>
+
+<div class="callout">
+  <p><strong>Alle Kategorien:</strong> Wenn du zuerst Kriterien willst, nutze die Kategorie-Seiten.</p>
+  <nav class="anbieter-quickcats" aria-label="Kategorie-Seiten">
+    <div class="quickcats-row">
+      {categories.map((c) => (
+        <a class="chip" href={categoryHref(c)}>
+          {c}{categoryCounts.get(c) ? <span class="muted"> ({categoryCounts.get(c)})</span> : null}
+        </a>
+      ))}
+    </div>
+    <p class="muted">Diese Links führen <em>nur</em> auf interne Anbieter-Profile. Affiliate-Links können erst auf den Profilseiten vorkommen.</p>
+  </nav>
+</div>
+  </div>
+
+  <div class="anbieter-page site-search-page" aria-label="Anbieter-Filter">
+
+    <div class="anbieter-panel js-only">
+      <div class="anbieter-toolbar">
+        <label class="filter-field filter-search">
+          <span class="filter-label">Suche</span>
+          <input id="anbieterSearch" type="search" placeholder="Suche Anbieter…" aria-label="Suche Anbieter" autocomplete="off" />
+        </label>
+        <button id="anbieterReset" class="anbieter-reset" type="button">Filter zurücksetzen</button>
+        <div class="anbieter-view-toggle" role="group" aria-label="Ansicht">
+          <button id="anbieterViewCards" class="toggle-btn is-active" type="button" aria-pressed="true">Karten</button>
+          <button id="anbieterViewTable" class="toggle-btn" type="button" aria-pressed="false">Tabelle</button>
+        </div>
+      </div>
+
+      <div class="filter-row anbieter-filters">
+        <label class="filter-field">
+          <span class="filter-label">Kategorie</span>
+          <select id="anbieterCat" aria-label="Kategorie filtern">
+            <option value="">Alle Kategorien</option>
+            {categories.map((c) => <option value={c}>{c}</option>)}
+          </select>
+        </label>
+
+        <label class="filter-field">
+          <span class="filter-label">Preis</span>
+          <select id="anbieterPrice" aria-label="Preis filtern">
+            <option value="">Alle Preise</option>
+            <option value="free">Kostenlos</option>
+            <option value="freemium">Freemium</option>
+            <option value="paid">Bezahlt</option>
+            <option value="mixed">Gemischt</option>
+            <option value="unknown">Unbekannt</option>
+          </select>
+        </label>
+
+        <label class="filter-field">
+          <span class="filter-label">Open Source</span>
+          <select id="anbieterOSS" aria-label="Open-Source filtern">
+            <option value="">Egal</option>
+            <option value="yes">Ja</option>
+            <option value="partial">Teilweise</option>
+            <option value="no">Nein</option>
+            <option value="unknown">Unbekannt</option>
+          </select>
+        </label>
+
+        <label class="filter-field">
+          <span class="filter-label">Konto</span>
+          <select id="anbieterAccount" aria-label="Konto erforderlich filtern">
+            <option value="">Egal</option>
+            <option value="no">Ohne Konto</option>
+            <option value="yes">Konto nötig</option>
+            <option value="unknown">Unbekannt</option>
+          </select>
+        </label>
+
+
+        <label class="filter-field">
+          <span class="filter-label">Region</span>
+          <select id="anbieterRegion" aria-label="Region filtern">
+            <option value="">Egal</option>
+            <option value="eu">EU/EWR</option>
+            <option value="ch">Schweiz</option>
+            <option value="uk">UK</option>
+            <option value="us">USA</option>
+            <option value="ca">Kanada</option>
+            <option value="other">Andere</option>
+            <option value="unknown">Unbekannt</option>
+          </select>
+        </label>
+
+        <label class="filter-field">
+          <span class="filter-label">Logs</span>
+          <select id="anbieterLogs" aria-label="Logs filtern">
+            <option value="">Egal</option>
+            <option value="none">Keine</option>
+            <option value="minimal">Minimal</option>
+            <option value="some">Vorhanden</option>
+            <option value="configurable">Konfigurierbar</option>
+            <option value="unknown">Unklar</option>
+          </select>
+        </label>
+
+        <label class="filter-field">
+          <span class="filter-label">Retention</span>
+          <select id="anbieterRetention" aria-label="Retention filtern">
+            <option value="">Egal</option>
+            <option value="short">≤7 Tage</option>
+            <option value="mid">≤30 Tage</option>
+            <option value="long">≤365 Tage</option>
+            <option value="verylong">&gt;365 Tage</option>
+            <option value="configurable">Konfigurierbar</option>
+            <option value="specified">Angabe vorhanden</option>
+            <option value="unknown">Unklar</option>
+          </select>
+        </label>
+
+        <label class="filter-field">
+          <span class="filter-label">Audits</span>
+          <select id="anbieterAudits" aria-label="Audits filtern">
+            <option value="">Egal</option>
+            <option value="yes">1+ genannt</option>
+            <option value="no">Keine genannt</option>
+          </select>
+        </label>
+
+        <label class="filter-field">
+          <span class="filter-label">Self-Hosting</span>
+          <select id="anbieterSelfHost" aria-label="Self-Hosting möglich filtern">
+            <option value="">Egal</option>
+            <option value="yes">Ja</option>
+            <option value="no">Nein</option>
+            <option value="unknown">Unklar</option>
+          </select>
+        </label>
+
+        {hasArchived ? (
+          <label class="filter-check">
+            <input id="anbieterHideArchived" type="checkbox" checked />
+            archivierte ausblenden
+          </label>
+        ) : null}
+      </div>
+
+      <div class="anbieter-meta">
+        <span id="anbieterCount" class="muted" aria-live="polite"></span>
+      </div>
+    </div>
+
+  <p class="no-js-note muted">
+    Hinweis: Die Filter oben funktionieren nur mit JavaScript. Ohne JavaScript siehst du einfach die vollständige Liste.
+  </p>
+
+  {/*
+    No‑JS only UI:
+    - Kategorie-Chips (Quickjump)
+    - Kategorie‑Überschriften in der Liste
+    Bei aktivem JavaScript gibt es Filter + Suche und eine flache Liste.
+  */}
+
+  <noscript>
+    <nav class="anbieter-quickcats" aria-label="Kategorien">
+      <div class="quickcats-row">
+        {categories.map((c) => <a class="chip" href={`#cat-${slugify(c)}`}>{c}</a>)}
+      </div>
+      <p class="muted">
+        Ohne JavaScript: Tippe eine Kategorie an oder nutze <kbd>Strg</kbd>/<kbd>Cmd</kbd>+<kbd>F</kbd>, um in der Liste zu suchen.
+      </p>
+    </nav>
+  </noscript>
+
+  <div id="anbieterResults" class="provider-results" aria-label="Anbieter-Liste">
+    {/* JS-Modus (Variante B): Liste wird aus JSON gerendert + "Mehr laden" */}
+    <div class="js-only">
+      <div id="anbieterCardsWrap">
+        <ul id="anbieterList" class="provider-list" aria-label="Anbieter-Ergebnisse"></ul>
+      </div>
+      <div id="anbieterTableWrap" hidden>
+        <div class="anbieter-table-scroll" tabindex="0">
+          <table id="anbieterTable" class="anbieter-table" aria-label="Vergleichstabelle">
+            <thead>
+              <tr>
+                <th scope="col">Anbieter</th>
+                <th scope="col">Kategorie</th>
+                <th scope="col">Preis</th>
+                <th scope="col">Open Source</th>
+                <th scope="col">Konto</th>
+                <th scope="col">Region</th>
+                <th scope="col">Logs</th>
+                <th scope="col">Retention</th>
+                <th scope="col">Audits</th>
+                <th scope="col">Self-Hosting</th>
+              </tr>
+            </thead>
+            <tbody id="anbieterTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="anbieter-footer" aria-label="Ergebnis-Navigation">
+        <span id="anbieterShown" class="muted" aria-live="polite"></span>
+        <button id="anbieterMore" class="btn" type="button" hidden>Mehr laden</button>
+      </div>
+    </div>
+
+    {/* No‑JS Modus: gruppiert nach Kategorie */}
+    <noscript>
+      <ul class="provider-list">
+        {categories.map((cat) => [
+          <li class="provider-group-title" id={`cat-${slugify(cat)}`} data-group-title={cat}>
+            <span>{cat}</span>
+            <span>{categoryCounts.get(cat)}</span>
+          </li>,
+          ...(groups.get(cat) ?? []).map((it) => (
+            <li class="provider-card">
+              <div class="provider-head">
+                <a class="provider-name" href={it.href}>{it.name}</a>
+                {it.website ? (
+                  <a
+                    class="provider-direct"
+                    href={`/go/${String(it.href || '').replace(/^\/anbieter\//, '').replace(/\/$/, '')}/`}
+                    rel="sponsored"
+                    aria-label={`Zu ${it.name} (Weiterleitung über /go/)`}
+                  >
+                    Direkt ↗
+                  </a>
+                ) : null}
+              </div>
+              <div class="provider-badges">
+                {it.category ? <span class="badge">{it.category}</span> : null}
+                {it.pricing ? <span class="badge badge-muted">{priceLabel(it.pricing)}</span> : null}
+                {it.open_source ? <span class={`badge ${badgeNeutral()}`}>Quellcode: {triLabel(it.open_source)}</span> : null}
+                {it.account_required ? <span class={`badge ${badgeNeutral()}`}>Konto: {triLabel(it.account_required)}</span> : null}
+                {String(it.region || '').toLowerCase() !== 'unknown' ? <span class={`badge ${badgeNeutral()}`}>Region: {regionLabel(it.region)}</span> : null}
+                {String(it.logs_level || '').toLowerCase() !== 'unknown' ? <span class={`badge ${badgeNeutral()}`}>Logs: {logsLabel(it.logs_level)}</span> : null}
+                {String(it.retention_level || '').toLowerCase() !== 'unknown' ? <span class={`badge ${badgeNeutral()}`}>Retention: {retentionLabel(it.retention_level)}</span> : null}
+                {it.audits_count ? <span class="badge badge-muted">Audits: {it.audits_count}</span> : null}
+                {String(it.self_host_possible || '').toLowerCase() === 'yes' ? <span class="badge badge-muted">Self-Hosting: ja</span> : null}
+                {statusBadge(it.status) ? <span class="badge badge-muted">Status: {statusBadge(it.status)}</span> : null}
+              </div>
+            </li>
+          )),
+        ])}
+      </ul>
+    </noscript>
+  </div>
+
+  {/* Data for client rendering (Variante B) */}
+  <template id="anbieterData" data-json set:html={JSON.stringify(items).replace(/</g, "\\u003c")}></template>
+
+  </div>
+
+  <!-- CSP-safe: external JS (allowed by script-src 'self') -->
+  <script src={anbieterUrl} defer></script>
+</DocLayout>

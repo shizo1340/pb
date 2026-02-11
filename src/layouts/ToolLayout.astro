@@ -1,0 +1,471 @@
+---
+import Base from './Base.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+import EeatBox from '../components/EeatBox.astro';
+import site from '../data/site.json';
+import nav from '../data/nav.json';
+import { makeBreadcrumbs } from '../lib/breadcrumbs';
+import { breadcrumbJsonLd, pageJsonLd } from '../lib/schema';
+
+// ToolLayout (HowTo)
+// - Always renders the same 6 sections in a fixed order.
+// - Content can come from:
+//   1) Markdown body (H2 sections)
+//   2) Frontmatter object `tool`
+
+const fm = Astro.props.frontmatter ?? Astro.props;
+
+const {
+  title = site.siteName,
+  description = site.defaultDescription,
+  robots = 'index,follow',
+  updated = null,
+  chapter = 'Tools',
+  level = null,
+  ogImage = site.defaultOgImage,
+  canonical = null,
+  url = null,
+} = fm;
+
+// Draft safety (same convention as DocLayout)
+const statusRaw = fm.status ?? fm.provider?.status ?? null;
+const status = String(statusRaw || '').trim().toLowerCase();
+const isDone = !status || status === 'done';
+const robotsFinal = isDone ? robots : 'noindex,follow';
+
+// Render slot once (build-time) so we can optionally extract body sections + keep NoScript safe.
+const slotHtmlRaw = isDone ? await Astro.slots.render('default') : '';
+
+// --------- Minimal helpers (no extra deps) ---------
+const escapeHtml = (s) => String(s ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+const stripTags = (html) => String(html ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+
+function toHtmlFromMarkdownish(input) {
+  const raw = String(input ?? '').trim();
+  if (!raw) return '';
+
+  const lines = raw.split(/\r?\n/);
+  const bullet = lines.filter((l) => /^\s*[-*]\s+/.test(l));
+  const ordered = lines.filter((l) => /^\s*\d+\.\s+/.test(l));
+
+  if (bullet.length === lines.length) {
+    return `<ul class="list">${lines.map((l) => `<li>${escapeHtml(l.replace(/^\s*[-*]\s+/, ''))}</li>`).join('')}</ul>`;
+  }
+  if (ordered.length === lines.length) {
+    return `<ol class="tool-steps">${lines.map((l) => `<li>${escapeHtml(l.replace(/^\s*\d+\.\s+/, ''))}</li>`).join('')}</ol>`;
+  }
+
+  // Paragraphs (blank line = new paragraph)
+  const paras = raw.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  return paras.map((p) => `<p>${escapeHtml(p).replace(/\n/g, '<br />')}</p>`).join('');
+}
+
+function extractSectionsFromBody(html) {
+  const out = {
+    goal: '',
+    prerequisites: '',
+    steps: '',
+    verify: '',
+    pitfalls: '',
+    extras: '',
+    extras_b: '',
+    extras_c: '',
+    stepsItemsText: [],
+  };
+
+  const src = String(html ?? '');
+  if (!src) return out;
+
+  // Split by H2 headings.
+  const re = /<h2\b[^>]*>[\s\S]*?<\/h2>/gi;
+  const matches = [...src.matchAll(re)];
+  if (!matches.length) return out;
+
+  for (let i = 0; i < matches.length; i++) {
+    const m = matches[i];
+    const hStart = m.index ?? 0;
+    const hEnd = hStart + m[0].length;
+    const nextStart = (matches[i + 1]?.index ?? src.length);
+    const headingText = stripTags(m[0]).toLowerCase();
+    const body = src.slice(hEnd, nextStart).trim();
+
+    if (!body) continue;
+
+    if (/^ziel\b/.test(headingText)) out.goal = body;
+    else if (/^voraussetzungen\b/.test(headingText)) out.prerequisites = body;
+    else if (/^(steps|schritte)\b/.test(headingText)) out.steps = body;
+    else if (/^(pruefen|prüfen|check)\b/.test(headingText)) out.verify = body;
+    else if (/^fehler\b/.test(headingText)) out.pitfalls = body;
+    else if (/^extras\b/.test(headingText)) out.extras = body;
+  }
+
+  // If Extras contains Pfad-B/C <details>, extract their bodies so we can render clean details.
+  if (out.extras) {
+    const detailsRe = /<details\b[\s\S]*?<\/details>/gi;
+    const blocks = out.extras.match(detailsRe) ?? [];
+    for (const b of blocks) {
+      const sum = (b.match(/<summary\b[^>]*>[\s\S]*?<\/summary>/i) ?? [''])[0];
+      const sumText = stripTags(sum).replace(/\s+/g, ' ').trim();
+      const inner = b
+        .replace(/^[\s\S]*?<summary\b[^>]*>[\s\S]*?<\/summary>/i, '')
+        .replace(/<\/details>\s*$/i, '')
+        .trim();
+
+      if (/^Pfad\s*B\b/i.test(sumText)) out.extras_b = inner;
+      if (/^Pfad\s*C\b/i.test(sumText)) out.extras_c = inner;
+    }
+
+    // If no explicit Pfad blocks exist, treat the entire Extras section as Pfad B.
+    if (!out.extras_b && !out.extras_c) {
+      out.extras_b = out.extras;
+    }
+  }
+
+  // Steps: collect LI texts for optional schema
+  if (out.steps) {
+    const li = [...out.steps.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)].map((x) => stripTags(x[1]));
+    out.stepsItemsText = li.filter(Boolean);
+  }
+
+  return out;
+}
+
+const bodySections = extractSectionsFromBody(slotHtmlRaw);
+
+const tool = (fm.tool && typeof fm.tool === 'object') ? fm.tool : {};
+
+// Prefer frontmatter data, then fallback to body sections.
+const goalData = tool.goal ?? bodySections.goal;
+const prerequisitesData = tool.prerequisites ?? bodySections.prerequisites;
+const stepsData = tool.steps ?? bodySections.steps;
+const verifyData = tool.verify ?? bodySections.verify;
+const pitfallsData = tool.pitfalls ?? bodySections.pitfalls;
+const extrasBData = tool.extras_b ?? bodySections.extras_b;
+const extrasCData = tool.extras_c ?? bodySections.extras_c;
+
+function hasMeaningful(v) {
+  if (Array.isArray(v)) return v.some((x) => String(x ?? '').trim());
+  if (v && typeof v === 'object') return Object.keys(v).length > 0;
+  return String(v ?? '').trim().length > 0;
+}
+
+function renderSimpleBlock(v) {
+  if (!hasMeaningful(v)) return '';
+  if (Array.isArray(v)) {
+    return `<ul class="list">${v.map((x) => `<li>${escapeHtml(x)}</li>`).join('')}</ul>`;
+  }
+  if (typeof v === 'string') {
+    // Body extraction already returns HTML; keep it.
+    const looksLikeHtml = /<\w+[\s\S]*>/.test(v);
+    return looksLikeHtml ? v : toHtmlFromMarkdownish(v);
+  }
+  return '';
+}
+
+function normalizeSteps(stepsValue) {
+  // Returns: { kind: 'strings'|'objects'|'html'|'none', items }
+  if (!hasMeaningful(stepsValue)) return { kind: 'none', items: [] };
+
+  if (Array.isArray(stepsValue)) {
+    // string[] OR [{title,text}]
+    const first = stepsValue[0];
+    if (typeof first === 'string') {
+      const items = stepsValue.map((s) => String(s ?? '').trim()).filter(Boolean);
+      return { kind: 'strings', items };
+    }
+    if (first && typeof first === 'object') {
+      const items = stepsValue
+        .map((s) => ({
+          title: String(s.title ?? '').trim(),
+          text: String(s.text ?? '').trim(),
+        }))
+        .filter((x) => x.title || x.text);
+      return { kind: 'objects', items };
+    }
+  }
+
+  if (typeof stepsValue === 'string') {
+    // Could be HTML (extracted from body) or plain text.
+    const looksLikeHtml = /<\w+[\s\S]*>/.test(stepsValue);
+    return { kind: 'html', items: looksLikeHtml ? String(stepsValue) : toHtmlFromMarkdownish(String(stepsValue)) };
+  }
+
+  return { kind: 'none', items: [] };
+}
+
+const stepsNorm = normalizeSteps(stepsData);
+
+// Ensure body-driven steps still render as a numbered list.
+let stepsHtmlNormalized = '';
+if (stepsNorm.kind === 'html') {
+  const h = String(stepsNorm.items ?? '').trim();
+  if (!h) {
+    stepsHtmlNormalized = '';
+  } else if (/<ol\b/i.test(h)) {
+    stepsHtmlNormalized = h;
+  } else if (/<ul\b/i.test(h)) {
+    stepsHtmlNormalized = h
+      .replace(/<ul\b/gi, '<ol')
+      .replace(/<\/ul>/gi, '</ol>');
+  } else {
+    // Fallback: keep whatever is there as a single numbered step.
+    stepsHtmlNormalized = `<ol class="tool-steps"><li><div class="tool-step">${h}</div></li></ol>`;
+  }
+}
+
+// Reading time: reuse DocLayout heuristic (rough), based on available content.
+const readingSourceText = (
+  stripTags(slotHtmlRaw) + ' ' +
+  [goalData, prerequisitesData, verifyData, pitfallsData, extrasBData, extrasCData]
+    .map((x) => (Array.isArray(x) ? x.join(' ') : String(x ?? '')))
+    .join(' ') +
+  (stepsNorm.kind === 'strings' ? stepsNorm.items.join(' ') : '') +
+  (stepsNorm.kind === 'objects' ? stepsNorm.items.map((x) => `${x.title} ${x.text}`).join(' ') : '')
+).trim();
+
+let readingLabel = 'In Arbeit';
+if (isDone) {
+  const words = readingSourceText ? readingSourceText.split(/\s+/).length : 0;
+  const readingMinutes = Math.max(1, Math.round(words / 200));
+  readingLabel = `Lesezeit: ${readingMinutes} Min.`;
+}
+
+const canonicalUrl = canonical
+  ? canonical
+  : (Astro.site
+      ? new URL(Astro.url.pathname, Astro.site).toString()
+      : new URL(Astro.url.pathname, site.baseUrl).toString());
+const canonicalUrlNorm = canonicalUrl.endsWith('/') ? canonicalUrl : `${canonicalUrl}/`;
+
+// Schemas: BreadcrumbList always + optional FAQ/HowTo/SoftwareApplication.
+
+// HowTo JSON-LD: only if steps exist.
+let schemaHowTo = null;
+if (isDone) {
+  let schemaSteps = [];
+  if (stepsNorm.kind === 'strings') schemaSteps = stepsNorm.items;
+  if (stepsNorm.kind === 'objects') {
+    schemaSteps = stepsNorm.items.map((x) => ({ name: x.title || undefined, text: x.text }));
+  }
+  // If steps came from body, use extracted LI texts.
+  if (!schemaSteps.length && Array.isArray(bodySections.stepsItemsText) && bodySections.stepsItemsText.length) {
+    schemaSteps = bodySections.stepsItemsText;
+  }
+  schemaHowTo = schemaSteps.length ? buildHowTo({ name: title, steps: schemaSteps }) : null;
+}
+
+
+
+const placeholder = '<p class="muted">Noch in Arbeit.</p>';
+const goalHtml = renderSimpleBlock(goalData) || placeholder;
+const prerequisitesHtml = renderSimpleBlock(prerequisitesData) || placeholder;
+const verifyHtml = renderSimpleBlock(verifyData) || placeholder;
+const pitfallsHtml = renderSimpleBlock(pitfallsData) || placeholder;
+const extrasBHtml = renderSimpleBlock(extrasBData) || placeholder;
+const extrasCHtml = renderSimpleBlock(extrasCData) || placeholder;
+
+const hasPfade = isDone && (hasMeaningful(extrasBData) || hasMeaningful(extrasCData));
+
+// Share cards: tool guides behave like articles.
+const ogTypeFinal = isDone ? 'article' : 'website';
+
+const crumbs = makeBreadcrumbs({
+  pathname: Astro.url?.pathname || '/',
+  title,
+  nav,
+  homeLabel: 'Start',
+  homeHref: '/start/',
+});
+
+const structuredData = isDone ? (
+  [
+    breadcrumbJsonLd(crumbs),
+    pageJsonLd({
+      schemaType: 'Article',
+      title,
+      description,
+      url: canonicalUrlNorm,
+      updated,
+      ogImage,
+    }),
+    ...(schemaHowTo ? [schemaHowTo] : []),
+  ]
+) : null;
+---
+
+<Base
+  title={title}
+  description={description}
+  robots={robotsFinal}
+  ogType={ogTypeFinal}
+  ogImage={ogImage}
+  updated={updated}
+  canonical={canonical}
+  structuredData={structuredData}
+>
+  <div class="container content">
+    <header class="page-hero">
+      <Breadcrumbs title={title} />
+      <h1 class="page-title">{title}</h1>
+      {description ? <p class="page-sub">{description}</p> : null}
+
+      <div class="page-meta">
+        <span>{readingLabel}</span>
+        {updated ? (<><span class="dot">•</span><span>Zuletzt aktualisiert: {updated}</span></>) : null}
+        {chapter ? (<><span class="dot">•</span><span>{chapter}</span></>) : null}
+        {(level && String(level).toLowerCase() !== 'none') ? (<><span class="dot">•</span><span>{level}</span></>) : null}
+      </div>
+    </header>
+
+    <div class="layout layout-single">
+      <article class="article">
+        {isDone ? (
+          <>
+            {hasPfade ? (
+              <>
+<noscript>
+              <div class="callout noscript-note">
+                <p><strong>JavaScript ist deaktiviert.</strong> Der Pfad‑Schalter (A/B/C) klappt Extras nicht automatisch auf.</p>
+                <p>Du kannst trotzdem alles lesen: öffne <em>„Pfad B“</em> / <em>„Pfad C“</em> unten einfach manuell.</p>
+              </div>
+            </noscript>
+
+            <div class="pfad-sticky" data-pfad-sticky>
+              <div class="pfad-bar" data-pfad-toggle aria-label="Pfad auswählen">
+                <div class="pfad-left">
+                  <span class="pfad-label" aria-hidden="true">Pfad</span>
+                  <div class="pfad-seg" role="radiogroup" aria-label="Wie weit willst du gehen?">
+                    <label class="pfad-opt" title="Pfad A: Standard (Alltag)">
+                      <input type="radio" name="pfad" value="A" />
+                      <span>A</span>
+                    </label>
+                    <label class="pfad-opt" title="Pfad B: Datensparsam">
+                      <input type="radio" name="pfad" value="B" />
+                      <span>B</span>
+                    </label>
+                    <label class="pfad-opt" title="Pfad C: High-Risk">
+                      <input type="radio" name="pfad" value="C" />
+                      <span>C</span>
+                    </label>
+                  </div>
+                </div>
+                <div class="pfad-hint" aria-hidden="true">
+                  <span><strong>A</strong> Alltag</span>
+                  <span class="dot">•</span>
+                  <span><strong>B</strong> datensparsam</span>
+                  <span class="dot">•</span>
+                  <span><strong>C</strong> High-Risk</span>
+                  <span class="dot">•</span>
+                  <span class="pfad-note">B/C öffnet Details</span>
+                </div>
+              </div>
+            </div>
+              </>
+            ) : null}
+
+            <div class="article-body markdown tool-layout">
+              <!-- 1) Ziel -->
+              <section class="tool-section" aria-labelledby="tool-ziel">
+                <h2 id="tool-ziel">Ziel</h2>
+                <div class="tool-section-body" set:html={goalHtml} />
+              </section>
+
+              <!-- 2) Voraussetzungen -->
+              <section class="tool-section" aria-labelledby="tool-voraussetzungen">
+                <h2 id="tool-voraussetzungen">Voraussetzungen</h2>
+                <div class="tool-section-body" set:html={prerequisitesHtml} />
+              </section>
+
+              <!-- 3) Steps -->
+              <section class="tool-section" aria-labelledby="tool-steps">
+                <h2 id="tool-steps">Steps</h2>
+
+                {stepsNorm.kind === 'strings' ? (
+                  <ol class="tool-steps">
+                    {stepsNorm.items.map((s) => (
+                      <li><div class="tool-step">{s}</div></li>
+                    ))}
+                  </ol>
+                ) : null}
+
+                {stepsNorm.kind === 'objects' ? (
+                  <ol class="tool-steps">
+                    {stepsNorm.items.map((st) => (
+                      <li>
+                        <div class="tool-step">
+                          {st.title ? <div class="tool-step-title">{st.title}</div> : null}
+                          {st.text ? <div class="tool-step-text" set:html={toHtmlFromMarkdownish(st.text)} /> : null}
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                ) : null}
+
+                {stepsNorm.kind === 'html' ? (
+                  // Body-driven content: try to preserve list semantics.
+                  // If the extracted HTML already contains an <ol>, keep it.
+                  // Otherwise fall back to a simple placeholder block.
+                  <div class="tool-steps-html" set:html={stepsHtmlNormalized || placeholder} />
+                ) : null}
+
+                {stepsNorm.kind === 'none' ? (
+                  <div class="tool-section-body" set:html={placeholder} />
+                ) : null}
+              </section>
+
+              <!-- 4) Prüfen -->
+              <section class="tool-section" aria-labelledby="tool-pruefen">
+                <h2 id="tool-pruefen">Prüfen</h2>
+                <div class="tool-section-body" set:html={verifyHtml} />
+              </section>
+
+              <!-- 5) Fehler -->
+              <section class="tool-section" aria-labelledby="tool-fehler">
+                <h2 id="tool-fehler">Fehler</h2>
+                <div class="tool-section-body" set:html={pitfallsHtml} />
+              </section>
+
+              <!-- 6) Extras (B/C) -->
+              <section class="tool-section" aria-labelledby="tool-extras">
+                <h2 id="tool-extras">Extras (B/C)</h2>
+
+                <div class="tool-extras">
+                  <details class="tool-extra" data-extra="B">
+                    <summary>Pfad B: Extras</summary>
+                    <div class="tool-section-body" set:html={extrasBHtml} />
+                  </details>
+
+                  <details class="tool-extra" data-extra="C">
+                    <summary>Pfad C: Extras</summary>
+                    <div class="tool-section-body" set:html={extrasCHtml} />
+                  </details>
+                </div>
+              </section>
+            </div>
+
+            <EeatBox
+              updated={updated}
+              tested_with={tested_with}
+              changelog={changelog}
+              isAnbieter={false}
+              scope={chapter ? `Kapitel: ${chapter}` : 'Tool'}
+            />
+          </>
+        ) : (
+          <div class="article-body markdown">
+            <div class="callout">
+              <p><strong>Hinweis:</strong> Diese Seite ist derzeit <strong>{status === 'archived' ? 'archiviert' : 'in Arbeit'}</strong> und wird bewusst nicht indexiert.</p>
+              <p>Nutze solange die Suche oben oder die Kapitel-Übersichten.</p>
+            </div>
+          </div>
+        )}
+      </article>
+    </div>
+  </div>
+</Base>

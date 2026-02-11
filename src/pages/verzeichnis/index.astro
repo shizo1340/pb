@@ -1,0 +1,255 @@
+---
+import DocLayout from '../../layouts/DocLayout.astro';
+
+// Verzeichnis als „HTML-Sitemap“:
+// - keine Such-/Explorer-Logik auf der Seite (die Suche ist global vorhanden)
+// - schnell, robust, gut zum Stöbern
+const mdModules = import.meta.glob('../../pages/**/index.md', { eager: true });
+
+const fmByUrl = new Map();
+for (const mod of Object.values(mdModules)) {
+  const fm = mod?.frontmatter;
+  if (fm && typeof fm.url === 'string') fmByUrl.set(fm.url, fm);
+}
+
+const frontmatter = {
+  title: 'Verzeichnis',
+  description:
+    'Alle Themen und Seiten als Übersicht nach Bereich – zum Stöbern. Für konkrete Begriffe nutze die Suche oben.',
+  url: '/verzeichnis/',
+  chapter: 'Start',
+  type: 'directory',
+  format: 'directory',
+  level: '',
+  money: 'no',
+  status: 'done',
+  updated: '2026-01-27',
+  robots: 'index,follow',
+};
+
+// Nicht alles hier listen (sonst wird es unübersichtlich):
+// - /anbieter/<slug>/ kann sehr viele Einträge enthalten → nur /anbieter/ als Einstieg.
+// - /verzeichnis/ selbst nicht in der Liste.
+function excludedInTree(url) {
+  if (url === '/verzeichnis/') return true;
+  if (url.startsWith('/anbieter/') && url !== '/anbieter/') return true;
+  return false;
+}
+
+const utilityLinks = [
+  { title: 'Start', url: '/' },
+  { title: 'Schnellstart', url: '/start/schnellstart/' },
+  { title: 'Wizard', url: '/wizard/' },
+  { title: 'Wissen', url: '/wissen/' },
+  { title: 'Tests', url: '/tests/' },
+  { title: 'Anbieter', url: '/anbieter/' },
+  { title: 'Affiliate-Hinweis', url: '/affiliate-hinweis/' },
+  { title: 'Impressum', url: '/impressum/' },
+  { title: 'Datenschutz', url: '/datenschutz/' },
+].filter((l) => l.url === '/' || fmByUrl.has(l.url));
+
+const pages = [...fmByUrl.entries()]
+  .map(([url, fm]) => ({
+    url,
+    title: typeof fm?.title === 'string' ? fm.title : url,
+  }))
+  .filter((p) => !excludedInTree(p.url))
+  .sort((a, b) => a.url.localeCompare(b.url, 'de'));
+
+function makeNode(seg) {
+  return { seg, url: null, title: null, children: new Map() };
+}
+
+const tree = makeNode('');
+for (const p of pages) {
+  const segs = p.url.split('/').filter(Boolean);
+  let node = tree;
+  for (const s of segs) {
+    if (!node.children.has(s)) node.children.set(s, makeNode(s));
+    node = node.children.get(s);
+  }
+  node.url = p.url;
+  node.title = p.title;
+}
+
+function count(node) {
+  let c = node.url ? 1 : 0;
+  for (const child of node.children.values()) c += count(child);
+  return c;
+}
+
+function label(node) {
+  if (node.title) return node.title;
+  if (node.url) return node.url;
+  return node.seg;
+}
+
+function sortedChildren(node) {
+  return [...node.children.values()].sort((a, b) => label(a).localeCompare(label(b), 'de'));
+}
+
+// Links aus der Unterstruktur (ohne den Knoten selbst)
+function flatten(node, depth = 0) {
+  const out = [];
+  const walk = (n, d) => {
+    for (const child of sortedChildren(n)) {
+      if (child.url) out.push({ url: child.url, title: label(child), depth: d });
+      if (child.children.size) walk(child, d + 1);
+    }
+  };
+  walk(node, depth);
+  return out;
+}
+
+const roots = sortedChildren(tree);
+---
+
+<DocLayout frontmatter={frontmatter}>
+  <div class="content">
+    <p>
+      Hier findest du alle Themen als Übersicht nach Bereich. Wenn du nach einem konkreten Begriff suchst, ist
+      die Suche oben meist schneller.
+    </p>
+
+    {utilityLinks.length > 0 && (
+      <>
+        <h2>Direkt</h2>
+        <ul class="dir-direct">
+          {utilityLinks.map((l) => (
+            <li><a href={l.url}>{l.title}</a></li>
+          ))}
+        </ul>
+      </>
+    )}
+
+    <h2>Alle Bereiche</h2>
+
+    <div class="dir-grid">
+      {roots.map((root) => (
+        <details class="dir-root">
+          <summary>
+            <span class="dir-root-title">
+              {root.url ? <a href={root.url}>{label(root)}</a> : label(root)}
+            </span>
+            <span class="dir-count">{count(root)}</span>
+          </summary>
+
+          <div class="dir-root-body">
+            <div class="dir-level2">
+              {sortedChildren(root).map((child) => {
+                const childHasChildren = child.children.size > 0;
+
+                // Blätter (keine Unterseiten) sollen nicht wie ein „leeres Accordion“ wirken.
+                if (!childHasChildren) {
+                  return (
+                    <div class="dir-leaf">
+                      <span class="dir-leaf-title">
+                        {child.url ? <a href={child.url}>{label(child)}</a> : <span>{label(child)}</span>}
+                      </span>
+                    </div>
+                  );
+                }
+
+                return (
+                  <details class="dir-child">
+                    <summary>
+                      <span>
+                        {child.url ? <a href={child.url}>{label(child)}</a> : <span>{label(child)}</span>}
+                      </span>
+                    </summary>
+
+                    <div class="dir-child-body">
+                      {(() => {
+                        const links = flatten(child, 0);
+                        if (links.length === 0) return <p class="dir-muted">Keine Unterseiten.</p>;
+                        return (
+                          <ul class="dir-links">
+                            {links.map((it) => (
+                              <li class={`dir-depth dir-depth-${it.depth}`}>
+                                <a href={it.url}>{it.title}</a>
+                              </li>
+                            ))}
+                          </ul>
+                        );
+                      })()}
+                    </div>
+                  </details>
+                );
+              })}
+            </div>
+          </div>
+        </details>
+      ))}
+    </div>
+  </div>
+
+  <style>
+      /* Direkt-Links oben können ruhig simpel bleiben */
+      .dir-direct{padding-left:1.2rem}
+
+      .dir-grid{display:grid;gap:1rem}
+
+      /* Zurück zum vorherigen <details>/<summary>-Look (passt besser ins Theme) */
+      .dir-root{
+        border:1px solid rgba(255,255,255,.08);
+        border-radius:14px;
+        padding:.25rem .75rem;
+        background:rgba(255,255,255,.02);
+      }
+      .dir-root summary{
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:1rem;
+        cursor:pointer;
+        padding:.65rem .2rem;
+      }
+      .dir-root-title{display:flex;align-items:center;min-width:0}
+      .dir-root-title a{text-decoration:none}
+      .dir-root-title a:hover{text-decoration:underline}
+
+      .dir-count{opacity:.65;font-variant-numeric:tabular-nums;white-space:nowrap}
+
+      .dir-root-body{padding:.25rem .2rem 1rem}
+      .dir-level2{display:grid;gap:.6rem}
+
+      .dir-child{
+        border:1px solid rgba(255,255,255,.07);
+        border-radius:12px;
+        padding:.2rem .6rem;
+        background:rgba(255,255,255,.02);
+      }
+      .dir-child summary{
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:1rem;
+        cursor:pointer;
+        padding:.6rem .1rem;
+      }
+      .dir-child summary a{text-decoration:none}
+      .dir-child summary a:hover{text-decoration:underline}
+      .dir-child-body{padding:.1rem .1rem .8rem}
+
+      /* Leaf-Items: gleiche Optik wie ein Summary-Row, aber ohne Accordion */
+      .dir-leaf{
+        border:1px solid rgba(255,255,255,.07);
+        border-radius:12px;
+        padding:.2rem .6rem;
+        background:rgba(255,255,255,.02);
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:1rem;
+      }
+      .dir-leaf-title a{text-decoration:none}
+      .dir-leaf-title a:hover{text-decoration:underline}
+
+      .dir-links{list-style:disc;padding-left:1.2rem;margin:.25rem 0 0}
+      .dir-depth{margin:.15rem 0}
+      .dir-depth-1{margin-left:1rem}
+      .dir-depth-2{margin-left:2rem}
+      .dir-depth-3{margin-left:3rem}
+      .dir-muted{opacity:.7;margin:.25rem 0 0}
+  </style>
+</DocLayout>

@@ -1,0 +1,21 @@
+{
+  "brandName": "PrivacyBasics",
+  "publisher": {
+    "@type": "Organization",
+    "name": "PrivacyBasics",
+    "url": "https://privacybasics.de/",
+    "description": "Nüchternes Handbuch & Verzeichnis für Privatsphäre und IT-Sicherheit. Keine Panik, keine Rankings."
+  },
+  "reviewer": {
+    "@type": "Organization",
+    "name": "PrivacyBasics Redaktion",
+    "url": "https://privacybasics.de/"
+  },
+  "links": {
+    "methodology": "/wissen/quellen/",
+    "affiliate": "/affiliate-hinweis/",
+    "imprint": "/impressum/",
+    "directory": "/anbieter/",
+    "feedback": "/impressum/"
+  }
+}

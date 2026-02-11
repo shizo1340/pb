@@ -1,0 +1,101 @@
+---
+import eeat from '../data/eeat.json';
+
+const {
+  updated = null,
+  tested_with = null,
+  changelog = null,
+  isAnbieter = false,
+  // Optional: show a short, neutral scope line.
+  scope = null,
+} = Astro.props;
+
+const hasChangelog = Array.isArray(changelog) ? changelog.length > 0 : Boolean(changelog);
+const changelogItems = Array.isArray(changelog)
+  ? changelog
+  : (typeof changelog === 'string' && changelog.trim())
+    ? changelog.split(/\r?\n/).map((s) => s.trim()).filter(Boolean)
+    : [];
+
+const testedItems = Array.isArray(tested_with)
+  ? tested_with
+  : (typeof tested_with === 'string' && tested_with.trim())
+    ? tested_with.split(/\r?\n|,\s*/).map((s) => s.trim()).filter(Boolean)
+    : [];
+---
+
+<aside class="eeat" aria-label="Methodik, Aktualität und Transparenz">
+  <div class="eeat-head">
+    <div class="eeat-title"><strong>Stand & Transparenz</strong></div>
+    <div class="eeat-meta">
+      <span>Zuletzt geprüft/aktualisiert: <strong>{updated ?? 'Unbekannt'}</strong></span>
+      {scope ? (<><span class="dot">•</span><span>{scope}</span></>) : null}
+    </div>
+  </div>
+
+  <div class="eeat-grid">
+    <div class="eeat-col">
+      <div class="eeat-k">Methodik</div>
+      <div class="eeat-v">
+        <a href={eeat.links.methodology}>Quellen & Prüfprinzipien</a>
+        <span class="sep">·</span>
+        <a href={eeat.links.imprint}>Impressum/Kontakt</a>
+      </div>
+      {isAnbieter ? (
+        <div class="eeat-note">
+          Affiliate-Links werden ausschließlich im Anbieter-Verzeichnis verwendet. Details: <a href={eeat.links.affiliate}>Affiliate-Hinweis</a>.
+        </div>
+      ) : null}
+    </div>
+
+    <div class="eeat-col">
+      <div class="eeat-k">Prüf-Setup</div>
+      <div class="eeat-v">
+        {testedItems.length ? (
+          <ul class="eeat-list">
+            {testedItems.slice(0, 6).map((t) => (<li>{t}</li>))}
+          </ul>
+        ) : (
+          <span class="muted">Nicht dokumentiert (kein Tool-/Versionsbezug oder nicht erhoben).</span>
+        )}
+      </div>
+    </div>
+
+    <div class="eeat-col">
+      <div class="eeat-k">Änderungen</div>
+      <div class="eeat-v">
+        {hasChangelog && changelogItems.length ? (
+          <ul class="eeat-list">
+            {changelogItems.slice(0, 4).map((c) => (<li>{c}</li>))}
+          </ul>
+        ) : (
+          <span class="muted">Kein Changelog hinterlegt.</span>
+        )}
+      </div>
+    </div>
+  </div>
+
+  <div class="eeat-foot">
+    <span class="muted">Hinweis: Inhalte sind ein Handbuch, keine Rechtsberatung. Bei akuten Vorfällen zählt Zeit: Sofortmaßnahmen zuerst.</span>
+  </div>
+</aside>
+
+<style>
+  .eeat{margin-top:2rem;padding:1.1rem 1.1rem 1rem;border:1px solid var(--border);border-radius:16px;background:var(--surface);}
+  .eeat-head{display:flex;flex-direction:column;gap:.35rem;margin-bottom:.9rem;}
+  .eeat-title{font-size:1rem;}
+  .eeat-meta{display:flex;flex-wrap:wrap;gap:.4rem .5rem;color:var(--muted);font-size:.95rem;}
+  .eeat-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem;}
+  .eeat-col{min-width:0;}
+  .eeat-k{font-size:.85rem;letter-spacing:.02em;color:var(--muted);text-transform:uppercase;margin-bottom:.35rem;}
+  .eeat-v{font-size:.98rem;}
+  .eeat-list{margin:.25rem 0 0;padding-left:1.05rem;}
+  .eeat-list li{margin:.15rem 0;}
+  .eeat-note{margin-top:.45rem;color:var(--muted);font-size:.93rem;}
+  .eeat-foot{margin-top:1rem;padding-top:.85rem;border-top:1px solid var(--border);}
+  .sep{margin:0 .35rem;color:var(--muted);}
+  .muted{color:var(--muted);}
+  @media (max-width: 900px){
+    .eeat-grid{grid-template-columns:1fr;}
+  }
+</style>
