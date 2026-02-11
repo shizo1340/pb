@@ -1,5 +1,0 @@
-{
-  "_comment": "Optional: override go/<slug> destination. Key = slug. Value can be a string URL or an object {url,status}. Example: { \"_defaultStatus\": 302, \"bitwarden\": { \"url\": \"https://bitwarden.com/?ref=...\", \"status\": 302 } }",
-  "_defaultStatus": 302,
-  "_version": 2
-}
