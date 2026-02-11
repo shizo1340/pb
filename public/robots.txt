@@ -1,8 +1,0 @@
-User-agent: *
-Allow: /
-
-# Redirect endpoints (affiliate routing)
-Disallow: /go/
-
-Sitemap: https://privacybasics.de/sitemap.xml
-Sitemap: https://privacybasics.de/rss.xml
